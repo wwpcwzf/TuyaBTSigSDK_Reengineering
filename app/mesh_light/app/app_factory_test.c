@@ -8,6 +8,10 @@
 #include "ty_gpio_base_test.h"
 #include "base_oem_config.h"
 
+#include "ty_rssi_base_test.h"
+#include "app_rssi.h"
+
+
 static u8 if_enter_factory_test = 0;
 ty_uart_cmd_server_for_factory_test_params_s ty_uart_cmd_server_for_factory_test_params = {
     .is_need_fingerprint_check = 1,
@@ -100,6 +104,7 @@ void app_factory_test_init(void){
 **/
 int app_factory_test_cmd(u8 cmd, u8 *data, u8 len){
     ty_uart_cmd_server_for_factory_test.receive_cmd(cmd,data,len);
+    return 0;
 }
 
 
@@ -109,7 +114,8 @@ int app_factory_test_cmd(u8 cmd, u8 *data, u8 len){
 * @return: none
 **/
 int app_factory_test_run(void){
-    
+
+    return 1;    
 }
 
 
@@ -121,3 +127,9 @@ int app_factory_test_run(void){
 int app_factory_test_if_enter(void){
     return if_enter_factory_test;
 }
+
+
+
+
+
+

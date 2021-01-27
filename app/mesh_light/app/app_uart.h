@@ -10,6 +10,8 @@
 
 #include "board.h"
 
+
+void app_uart_deinit(void);
 /**
 * @description: uart init
 * @param {none}

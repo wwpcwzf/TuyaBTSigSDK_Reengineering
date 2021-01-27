@@ -12,6 +12,12 @@
 #include "ty_light_save_user_flash.h"
 #include "app_light_cmd.h"
 
+#include "ty_light_basis_tools.h"
+#include "ty_light_scene.h"
+
+#include "app_light_control.h"
+#include "ty_light_json_config.h"
+
 /**
 * @description: MCU controls the lamp through uart
 * @param {u8 fur} feature
@@ -33,7 +39,7 @@ void app_mesh_uart_ctl(u8 fur, u8 *params, u8 len){
                 }
                 if((params[0]&0x04)||(params[0]&0x08)||(params[0]&0x10))
                 {
-                    u16 tuya_H,tuya_S,tuya_V;
+                    u16 tuya_H = 0,tuya_S = 0,tuya_V = 0;
                     // COLOR_RGB_T       ColorData;
                     // COLOR_ORIGIN_T    ColorOrigin;
 

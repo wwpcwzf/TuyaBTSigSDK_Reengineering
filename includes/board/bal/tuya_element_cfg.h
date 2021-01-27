@@ -26,7 +26,9 @@
 #define SCENE_SERVER_EN                       1
 #define SCENE_CLIENT_EN                       0
 
-#define TELINK_PM_DEEPSLEEP_RETENTION_ENABLE  0
+#ifndef TELINK_PM_DEEPSLEEP_RETENTION_ENABLE //---------------wwpc 20210127 消除警告重复定义
+  #define TELINK_PM_DEEPSLEEP_RETENTION_ENABLE  0
+#endif
 
 #define USED_NV1
 

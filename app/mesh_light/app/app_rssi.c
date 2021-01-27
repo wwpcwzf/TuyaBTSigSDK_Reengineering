@@ -13,12 +13,17 @@
 #include "ty_uart_cmd_server_for_factory_test.h"
 #include "ty_timer_event.h"
 
+#include "app_uart.h"
+#include "app_common.h"
+
 
 extern AppVendorS mAppVendor; 
 
 static u8 is_rssi_test = 0;
 static u8 test_name[20] = "ty_prod";
 static u8 test_name_len = 7;
+
+
 
 
 /**

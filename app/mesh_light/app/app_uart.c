@@ -16,6 +16,8 @@
 #include "app_light_cmd.h"
 #include "app_common.h"
 
+#include "app_factory_test.h"
+
 
 #define     F_HEAD1                     0x00
 #define     F_HEAD2                     0x01
@@ -30,7 +32,7 @@
 #define     F_MIN_LEN                   0x07
 #define     F_MAX_LEN                   0xFF
 
-static u8 uart_init_flg = 0;
+//static u8 uart_init_flg = 0;
 
 ty_uart_cmd_server_params_s ty_uart_cmd_server_params = {
 };
@@ -151,7 +153,7 @@ void app_uart_run(void){
 * @return: none
 **/
 static void app_uart_server_run(void){
-    static u8 is_factory = 1;
+    //static u8 is_factory = 1;
     u8 i,num = ty_fifo_get_size();
     if(num < F_MIN_LEN)return;
     

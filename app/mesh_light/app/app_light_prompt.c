@@ -13,12 +13,22 @@
 #include "app_light_prompt.h"
 #include "ty_light_driver_set.h"
 
+#include "tuya_sigmesh_hal.h"
 
 #include "ty_light_gradual.h"
 #include "ty_light_basis_sw_timer.h"
 #include "app_light_control.h"
 #include "ty_light_cfg_init.h"
 #include "ty_light_json_config.h"
+
+#include "ty_light_basis_tools.h"
+#include "ty_light_scene.h"
+
+#include "app_light_control.h"
+
+#include "app_light_cmd.h"
+
+
 #define BREATH_UNIT_TIME             2  //2s @attention: accurate time is 2100ms
 #define BREATH_ALWAY_ON_TIME        602         //@attention: breath alway on config time
 #define BREATH_ALWAY_ON_CNT         0xFFFFFFFF   //@attention: this value to avoid breath stop!(bigger than 65535)
@@ -57,7 +67,7 @@ static void app_light_ctrl_blink_display(void)
     OPERATE_LIGHT opRet = 1;
     static u16 ucCnt = 0;       /* first blink off */
     BRIGHT_DATA_T tCtrlData;
-    u16 usBrightTemp;
+    u16 usBrightTemp = 0;
 
     memset(&tCtrlData, 0, sizeof(BRIGHT_DATA_T));
     app_light_shade_ctrl_disable();       /* stop all shade process! */
@@ -535,7 +545,7 @@ static OPERATE_LIGHT app_light_ctrl_favorite(void)
     OPERATE_LIGHT opRet = 1;    
 	BRIGHT_DATA_T Result;
 
-    static u16 usStandIndex = 0;
+    //static u16 usStandIndex = 0;
     static u8 ucCnt = 0; 
 
 	app_light_shade_ctrl_disable();

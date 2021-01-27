@@ -27,6 +27,11 @@
 #include "ty_light_uart_ctrl.h"
 
 
+
+
+#include "lutec_main.h"
+
+
 u16 inquire_src = 0;
 u16 inquire_dst = 0;
 
@@ -205,6 +210,9 @@ void mesh_app_init(void){
         TY_LOG_ERR("Prod init error!");
         return;
     }
+
+    //---------------------wwpc 20210126
+    lutec_main_init();
 }
 
 /**
@@ -214,6 +222,9 @@ void mesh_app_init(void){
 **/
 void mesh_main_run(void){
     app_light_ctrl_loop();
+
+    //---------------------wwpc 20210126
+    lutec_main_loop();
 }
 
 
@@ -248,7 +259,7 @@ void app_tuya_mdev_test(uint8_t is_Authorized, uint8_t rssi){
     APP_LOG("%s\r\n",__FUNCTION__);
     tuya_gatt_adv_beacon_enable(0); // when mdev test close prov, if do not need can delete this callback
     
-    OPERATE_LIGHT opRet = 1;
+    //OPERATE_LIGHT opRet = 1;
 	ty_light_mdev_prod_test_callback(is_Authorized,rssi);
 }
 
@@ -262,7 +273,7 @@ void app_tuya_mdev_test(uint8_t is_Authorized, uint8_t rssi){
 **/
 
 void mesh_state_callback(mesh_state_t stat){
-    OPERATE_LIGHT opRet = 1;
+    //OPERATE_LIGHT opRet = 1;
     static char LastMeshStat = 0xFF;
     TY_LOG_NOTICE("last mesh stat:%d, mesh stat %d",LastMeshStat,stat);
     if(LastMeshStat != stat) {
@@ -354,7 +365,7 @@ void app_tuya_vendor_light_dp_data(u8 *par, int par_len){
             }
             break;
         case VD_CMD_POWER_MEMORY:{//power_memory
-                u32 len = par[3];
+                //u32 len = par[3];
                 tLightMemCfgData.usFlag = 0x01;
                 tLightMemCfgData.usMemory = par[5];
                 if(USER_MODE == tLightMemCfgData.usMemory)
@@ -460,6 +471,7 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
     uart_reply_addr = src_addr;
 
     APP_LOG_DUMP("recv data\r\n", data, data_len);
+    hal_uart_send(data, data_len);
 
     OPERATE_LIGHT opRet = 1;
     bool bActiveFlag = FALSE;

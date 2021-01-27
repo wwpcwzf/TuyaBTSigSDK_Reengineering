@@ -10,7 +10,8 @@
 
 #include "board.h"
 
-#define BIT(n)                  		    (1<<(n))
+#include "bsp.h"
+//#define BIT(n)                  		    (1<<(n))
 
 //ONE FRAME
 #define     F_UART_CMD_SERVER_FOR_FACTORY_TEST_HEAD1                     0x00

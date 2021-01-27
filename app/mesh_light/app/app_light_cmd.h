@@ -219,6 +219,14 @@ void app_tuya_vendor_light_countdown_data(u8 *data);
  */
 void app_tuya_vendor_light_lightmem_data(u8 *data);
 
+
+/**
+ * @brief: light ctrl data init
+ * @param {none}
+ * @retval: OPERATE_LIGHT
+ */
+OPERATE_LIGHT app_ty_light_ctrldata_init(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

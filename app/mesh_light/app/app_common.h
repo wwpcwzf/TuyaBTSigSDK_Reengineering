@@ -39,5 +39,7 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
 
 u16 tuya_get_uart_reply_addr(void);
 
+void app_tuya_mdev_test(uint8_t is_Authorized, uint8_t rssi);
+
 #endif
 

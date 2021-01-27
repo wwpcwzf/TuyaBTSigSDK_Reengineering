@@ -17,6 +17,9 @@
 #include "ty_light_basis_tools.h"
 #include "ty_light_save_user_flash.h"
 
+#include "ty_light_json_config.h"
+#include "app_common.h"
+
 u8 light_not_disturb;
 extern LIGHT_MDEV_TEST_DATA_FLASH_T tProdResult;
 /**
@@ -191,9 +194,11 @@ OPERATE_LIGHT app_light_ctrl_data_hsv_set(IN u16 usHue,IN u16 usSat,IN u16 usVal
  */
 OPERATE_LIGHT app_light_ctrl_data_hsl_set(IN u16 usHue,IN u16 usSat,IN u16 usLightness)
 {
-    u16 h,s,v;
+    u16 h = 0,s = 0,v = 0;
     ty_light_basis_tools_hsl2hsv(usHue, usSat, usLightness, &h, &s, &v);
     app_light_ctrl_data_hsv_set(h, s, v);
+
+    return LIGHT_OK;
 }
 
 
@@ -377,6 +382,8 @@ OPERATE_LIGHT app_light_ctrl_data_countdown_set(IN u32 uiCountDownSec)
 OPERATE_LIGHT app_light_ctrl_data_countdown_get(OUT u32 *CountdownTime)
 {
     *CountdownTime = tLightCtrlData.uiCountDown;
+
+    return LIGHT_OK;
 }
 
 
@@ -399,6 +406,8 @@ bool app_light_ctrl_data_not_disturb_get(void)
 OPERATE_LIGHT app_light_ctrl_data_not_disturb_set(IN bool bNotDisturb)
 {
     light_not_disturb = bNotDisturb;
+
+    return LIGHT_OK;
 }
 
 /**

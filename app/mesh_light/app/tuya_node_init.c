@@ -11,6 +11,8 @@
 #include "tuya_sigmesh_hal.h"
 #include "ty_uart_cmd_server_for_factory_test.h"
 #include "base_oem_config.h"
+#include "ty_light_json_config.h"
+
 
 static node_info_t node_info = {0};
 

@@ -18,6 +18,14 @@
 #include "ty_light_basis_sw_timer.h"
 #include "ty_light_scene.h"
 
+#include "ty_light_gradual.h"
+#include "ty_light_basis_hw_timer.h"
+#include "app_light_cmd.h"
+
+
+
+
+
 /// light ctrl data(status)
 LIGHT_CTRL_DATA_T tLightCtrlData;
 
@@ -267,7 +275,7 @@ OPERATE_LIGHT app_light_real_time_ctrl_proc(void)
     u16 usBright ,usTemp;
     u16 usHue, usSat, usVal;
     LIGHT_CTRL_DATA_T tCtrlDataTemp;
-    OPERATE_LIGHT opRet = 1;
+    //OPERATE_LIGHT opRet = 1;
 
     COLOR_RGB_T ColorDataTemp;
 
@@ -382,7 +390,7 @@ void app_light_ctrl_gradual_enable(void)
     opRet = ty_light_basis_hw_timer_start(HW_TIMER_CYCLE_US, (void *)ty_light_gradual_hw_timer_handler);     /* start shade need hardware timer! */
     if(opRet != LIGHT_OK) {
         TY_LOG_ERR("Light hardware timer init error!");
-        return opRet;
+        return ;
     }
 }
 
