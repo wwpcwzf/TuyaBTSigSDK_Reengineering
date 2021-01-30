@@ -39,11 +39,70 @@ void lutec_main_loop(void)
 
 
 
+void lutec_mesh_state_callback(mesh_state_t m_state)
+{
+  switch(m_state) 
+  {
+    case NODE_POWER_ON_UNPROVISION: //
+    
+    break;
+    case NODE_POWER_ON_IN_MESH:
+    
+    break;
+    case NODE_PROVISION_SUCCESS:
+    
+    break;
+    case NODE_KICK_OUT:
+    
+    break;
+    case NODE_MESH_RESET:
+    
+    break;
+    case NODE_RECOVER_IN_MESH:
+    
+    break;
+    case TY_OTA_START:
+    
+    break;
+    case TY_OTA_SUCCESS:
+    case TY_OTA_FAIL:
+    
+    break;
+    case TY_GROUP_SUB_ADD:
+    
+    break;
+    case TY_GROUP_SUB_DEL:
+    
+    break;
+    default:
+
+    break;
+  }
+
+}
+
+//???????????????????
+void lutec_save_data_set_variable_callback(LIGHT_CUST_DATA_FLASH_T *Data_Ptr)
+{
+
+
+}
+
+//???????
+void lutec_read_saved_data_callback(int isready, LIGHT_CUST_DATA_FLASH_T R_Data)
+{
+  if(isready != 0)//LIGHT_OK = 0 ????
+    return;
 
 
 
+}
 
+//???????
+void lutec_scenes_control_start(void)
+{
 
-
-
+  
+}
+/***************************************File end********************************************/
 

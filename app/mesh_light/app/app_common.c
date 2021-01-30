@@ -28,8 +28,9 @@
 
 
 
-
+//---------------------wwpc 20210129
 #include "lutec_main.h"
+#include "lutec_bt_dp.h"
 
 
 u16 inquire_src = 0;
@@ -276,8 +277,13 @@ void mesh_state_callback(mesh_state_t stat){
     //OPERATE_LIGHT opRet = 1;
     static char LastMeshStat = 0xFF;
     TY_LOG_NOTICE("last mesh stat:%d, mesh stat %d",LastMeshStat,stat);
-    if(LastMeshStat != stat) {
-        switch(stat) {
+    if(LastMeshStat != stat) 
+    {
+        //---------------------wwpc 20210129
+        lutec_mesh_state_callback(stat);
+
+        switch(stat) 
+        {
             case NODE_POWER_ON_UNPROVISION:
                     app_light_ctrl_prompt_start();
                 break;
@@ -409,8 +415,18 @@ void app_tuya_vendor_set_light_data(uint16_t src_addr, uint16_t dst_addr, u8 *pa
     }
     else{
         switch(par[0]){
-            case 1:{
-                app_tuya_vendor_light_dp_data(par, par_len);
+            case 1:
+            {
+                //--------------------------wwpc 20210129
+                //app_tuya_vendor_light_dp_data(par, par_len);
+                if((par[1] > 100) && (par[1] < 129))
+                {
+                    lutec_bluetooth_dp_data(par, par_len);
+                }
+                else
+                {
+                    app_tuya_vendor_light_dp_data(par, par_len);
+                }
             }
             break;
             #if LIGHT_CFG_REMOTE_ENABLE

@@ -42,7 +42,7 @@ static u32 guiBlinkTimeMs = 0;
  */
 static void app_light_ctrl_normal_display(void)
 {
-    OPERATE_LIGHT opRet = 1;
+    //OPERATE_LIGHT opRet = 1;
     BRIGHT_DATA_T tCtrlData;
 
     TY_LOG_DEBUG("normal display....");
@@ -449,14 +449,20 @@ static OPERATE_LIGHT app_light_prompt_ctrl_auto_stop(void)
 void app_light_ctrl_prompt_start(void)
 {
     OPERATE_LIGHT opRet = 1;
-    if(ty_light_json_config_get_jsonver()>=117){
-        if(ty_light_cfg_init_get_connect_mode()== 0x02){
-            if(tuya_hal_get_power_cnt()>=ty_light_json_config_get_resetnum()){
+    if(ty_light_json_config_get_jsonver() >= 117)//get json version string
+    {
+        if(ty_light_cfg_init_get_connect_mode() == 0x02)//get connect mode cfg
+        {
+            if(tuya_hal_get_power_cnt() >= ty_light_json_config_get_resetnum())//power on/off to reset the device
+            {
 				opRet = app_light_prompt_ctrl_auto_start();  /* start prompt */
-                if(opRet != LIGHT_OK) {
+                if(opRet != LIGHT_OK) 
+                {
                     TY_LOG_ERR("start prompt timer error!");
                 }
-            }else{
+            }
+            else
+            {
                 app_light_ctrl_proc();
             }
             

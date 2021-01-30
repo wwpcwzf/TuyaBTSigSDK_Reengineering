@@ -20,6 +20,9 @@
 #include "ty_light_json_config.h"
 #include "app_common.h"
 
+//--------------------------------wwpc 20210129
+#include "lutec_main.h"
+
 u8 light_not_disturb;
 extern LIGHT_MDEV_TEST_DATA_FLASH_T tProdResult;
 /**
@@ -583,6 +586,9 @@ OPERATE_LIGHT app_light_ctrl_data_auto_save(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
 		case TYPE_USER_DATA:{ 
                 LIGHT_CUST_DATA_FLASH_T tSaveCustData;
                 memset(&tSaveCustData, 0, sizeof(LIGHT_CUST_DATA_FLASH_T));
+                //------------------------------------------wwpc  20210129
+                lutec_save_data_set_variable_callback(&tSaveCustData);
+
             #if (LIGHT_CFG_3IN1_SAVE == 1) 
                 ty_light_save_user_flash_open_appdata();
                 ty_light_save_user_flash_write_3in1_data(TYPE_USER_DATA,&tSaveCustData);
@@ -670,14 +676,18 @@ OPERATE_LIGHT app_light_ctrl_data_auto_read(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
                 app_light_ctrl_proc();
             }
             break;
-		case TYPE_USER_DATA:{ 
+		case TYPE_USER_DATA:
+            { 
                 LIGHT_CUST_DATA_FLASH_T tReadCustData;
                 memset(&tReadCustData, 0, sizeof(LIGHT_CUST_DATA_FLASH_T));
             #if (LIGHT_CFG_3IN1_SAVE == 1) 
-                ty_light_save_user_flash_read_3in1_data(TYPE_USER_DATA,&tReadCustData);
+                opRet = ty_light_save_user_flash_read_3in1_data(TYPE_USER_DATA,&tReadCustData);
             #else
-                ty_light_save_user_flash_read_data(TYPE_USER_DATA,&tReadCustData);
+                opRet = ty_light_save_user_flash_read_data(TYPE_USER_DATA,&tReadCustData);
             #endif
+                //--------------------------------------------wwpc 20210129
+                lutec_read_saved_data_callback(opRet, tReadCustData);
+
             }
 		    break;
 		default:

@@ -44,6 +44,8 @@ typedef enum
     COLOR_MODE,
     SCENE_MODE,
     MUSIC_MODE,
+    /*--------------------wwpc 20210129*/
+    LUTEC_MODE,
     MODE_MAX,
 }LIGHT_MODE_E;
 
@@ -169,7 +171,7 @@ typedef struct{
 #ifndef LIGHT_COM_ERROR
 #define LIGHT_COM_ERROR                      (-1)
 #endif
-#ifndef LIGHT_INVALID_PARM
+#ifndef LIGHT_INVALID_PARM  //无效参数
 #define LIGHT_INVALID_PARM                   (-2)
 #endif
 #ifndef LIGHT_MALLOC_FAILED

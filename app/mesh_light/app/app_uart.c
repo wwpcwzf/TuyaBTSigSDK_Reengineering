@@ -18,6 +18,8 @@
 
 #include "app_factory_test.h"
 
+//--------------------------wwpc 20210129
+#include "lutec_wifi.h"
 
 #define     F_HEAD1                     0x00
 #define     F_HEAD2                     0x01
@@ -133,7 +135,8 @@ void app_uart_run(void){
         }
         PR_DEBUG_RAW("\n");
     }
-
+//----------------------------------------wwpc 20210129
+#if 0
     app_factory_test_run();
 #if LIGHT_CFG_UART_ENABLE
     static u8 work_state = 0;
@@ -144,6 +147,8 @@ void app_uart_run(void){
     }
 #endif
     app_uart_server_run();//解析FIFO中的数据，并调用相应的处理函数
+#endif 
+    lutec_uart_server_run(); //参考app_uart_server_run()对uart的FIFO进行处理
 }
 
 

@@ -140,20 +140,28 @@ OPERATE_LIGHT app_light_ctrl_proc(void)
                     params.eMode = JUMP_MODE;
                     ty_light_gradual_ctrl_start(&params);
                     break;
-                    
+
+                //--------------------wwpc 20210129
+                case LUTEC_MODE: //自定义场景模式
+                    lutec_scenes_control_start();
+                    break;
+
                 default:
                     break;
             }
-        } else if(SWITCH_DIRECT == ty_light_cfg_init_get_switchmode()) {   /* shut down directly */
+        } 
+        else if(SWITCH_DIRECT == ty_light_cfg_init_get_switchmode()) {   /* shut down directly */
             ty_light_scene_ctrl_change_stop();
             params.eMode = JUMP_MODE;
             ty_light_gradual_ctrl_start(&params);
-        } else {    /* LightCfgData.Switch_mode */
+        } 
+        else {    /* LightCfgData.Switch_mode */
             ;       /* no possible  */
         }
         
 
-    } else {    /* onoff ctrl state -- turn on */ 
+    } 
+    else {    /* onoff ctrl state -- turn on */ 
 
         TY_LOG_DEBUG("current mode %d", tLightCtrlData.eMode);
         
@@ -161,20 +169,26 @@ OPERATE_LIGHT app_light_ctrl_proc(void)
             
             ty_light_scene_ctrl_start();
             opRet = ty_light_scene_ctrl_change(&bEableFlag, &uiCycleTime);   /* start */
-            if(opRet != LIGHT_OK){
+            if(opRet != LIGHT_OK)
+            {
                 TY_LOG_ERR("Scene change err!");
             }
 
-            if(bEableFlag == TRUE) {
+            if(bEableFlag == TRUE) 
+            {
                 ty_light_scene_ctrl_change_start(uiCycleTime);
-            } else {
+            } 
+            else 
+            {
                 TY_LOG_DEBUG("Scene don't need change!");
                 opRet = ty_light_basis_sw_timer_stop(SCENE_SW_TIMER);      /* stop timer dominantly */
-                if(opRet != LIGHT_OK) {
+                if(opRet != LIGHT_OK) 
+                {
                     TY_LOG_ERR("stop scene timer error!");
                 }
             }
-        } else if(tLightCtrlData.eMode == MUSIC_MODE) {   /* mode is music mode!!!! */ /* this mode only appear turn on firstly */
+        } 
+        else if(tLightCtrlData.eMode == MUSIC_MODE) {   /* mode is music mode!!!! */ /* this mode only appear turn on firstly */
             ty_light_scene_ctrl_change_stop();
 
             LIGHT_CTRL_DATA_T tMusicCtrlData;
@@ -192,7 +206,8 @@ OPERATE_LIGHT app_light_ctrl_proc(void)
             params.eMode = NORMAL_MODE;
             ty_light_gradual_ctrl_start(&params);
             
-        } else {    /* mode is not scene and music mode ,mode is white or color mode ! */
+        } 
+        else {    /* mode is not scene and music mode ,mode is white or color mode ! */
             ty_light_scene_ctrl_change_stop();
             if(bLastSwitchStatus != FALSE) {        /* already turn on */
                 app_ty_light_gradual_ctrl_calc_rgbcw(tLightCtrlData.eMode, &tLightCtrlData, &tCtrlData);
@@ -201,7 +216,8 @@ OPERATE_LIGHT app_light_ctrl_proc(void)
                 params.eMode = NORMAL_MODE;
                 ty_light_gradual_ctrl_start(&params);
                 
-            } else {        /* firstly turn on */
+            } 
+            else {        /* firstly turn on */
             
                 if(SWITCH_GRADUAL == ty_light_cfg_init_get_switchmode()) {
                     app_ty_light_gradual_ctrl_calc_rgbcw(tLightCtrlData.eMode, &tLightCtrlData, &tCtrlData);
@@ -210,14 +226,16 @@ OPERATE_LIGHT app_light_ctrl_proc(void)
                     params.eMode = NORMAL_MODE;
                     ty_light_gradual_ctrl_start(&params);
                     
-                } else if(SWITCH_DIRECT == ty_light_cfg_init_get_switchmode()) {
+                } 
+                else if(SWITCH_DIRECT == ty_light_cfg_init_get_switchmode()) {
                     app_ty_light_gradual_ctrl_calc_rgbcw(tLightCtrlData.eMode,  &tLightCtrlData, &tCtrlData);
 
                     ty_light_gradual_ctrl_targetset(RGBCW_MODE,&tCtrlData);
                     params.eMode = NORMAL_MODE;
                     ty_light_gradual_ctrl_start(&params);
                     
-                } else {    /* LightCfgData.Switch_mode */    
+                } 
+                else {    /* LightCfgData.Switch_mode */    
                     ;       /* no possible  */
                 }
             }

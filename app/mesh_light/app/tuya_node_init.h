@@ -90,3 +90,4 @@ void app_tuya_mesh_category_set(uint16_t mesh_category);
 
     
 #endif
+/***************************************File end********************************************/
