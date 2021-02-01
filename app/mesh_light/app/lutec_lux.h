@@ -10,9 +10,9 @@
 
 
 
-void adc_gpio_ain_init(void);
+	void adc_gpio_ain_init(void);
 
-void lux_adc_init(void);
+	void lux_adc_init(void);
 
 
 #endif

@@ -11,7 +11,7 @@
 
 
 
-void lutec_pir_set_pin_init(void);
+	void lutec_pir_set_pin_init(void);
 
 
 

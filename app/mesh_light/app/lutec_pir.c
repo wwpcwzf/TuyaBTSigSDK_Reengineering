@@ -36,10 +36,10 @@
 -------------------------------------------------------------------------*/
 void lutec_pir_set_pin_init(void)
 {
-  
-  hal_gpio_set_func(GPIO_PD2, GPIO_FUNC_AS_PWM);
-  hal_pwm_set(PWM3_ID, 1000, 100);
-  hal_pwm_start(PWM3_ID);
+	
+	hal_gpio_set_func(GPIO_PD2, GPIO_FUNC_AS_PWM);
+	hal_pwm_set(PWM3_ID, 1000, 100);
+	hal_pwm_start(PWM3_ID);
 }
 
 

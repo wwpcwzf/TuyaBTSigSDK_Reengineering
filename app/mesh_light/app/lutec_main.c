@@ -23,8 +23,8 @@
 void lutec_main_init(void)
 {
 
-  lutec_pir_set_pin_init();
-  lux_adc_init();
+	lutec_pir_set_pin_init();
+	lux_adc_init();
 
 }
 
