@@ -28,7 +28,7 @@
 
 
 
-	static u8 lutec_check_sum(u8* data, u8 len);
+    u8 lutec_check_sum(u8* data, u8 len);
 
 
 
@@ -38,6 +38,10 @@
 	void lutec_wifi_module_data(u8* cmd_ptr, u8 para_l);
 
 	void lutec_remote_bluetooth_data(u8* data_ptr, u8 data_l);
+
+    void lutec_ack_by_wifi(u8 ackid);
+
+    void lutec_updata_by_wifi(u8* data_ptr, u8 data_l);
 
 #endif
 

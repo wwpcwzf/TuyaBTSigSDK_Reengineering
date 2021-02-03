@@ -8,12 +8,33 @@
 #ifndef _LUTEC_PIR_H
 #define _LUTEC_PIR_H
 
+    #include "../../../includes/board/chip/telink_sig_mesh_sdk/sdk/proj/common/types.h"
 
 
 
-	void lutec_pir_set_pin_init(void);
 
 
+
+
+
+
+
+
+
+
+
+
+void lutec_pir_init(void);
+
+void lutec_pir_signal_pin_init(void);
+
+void lutec_pir_loop(void);
+
+u8 lutec_pir_someone(void);
+
+void lutec_pir_set_pin_init(void);
+
+void lutec_pir_set_sensitivity(u8 percent);
 
 #endif
 

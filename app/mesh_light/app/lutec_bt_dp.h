@@ -25,7 +25,11 @@
 
 
 
-	void lutec_bluetooth_dp_data(u8 *par, int par_len);
+	void lutec_bluetooth_dp_data(u16 s_addr, u16 d_addr, u8 *par, int par_len);
+
+    u8 lutec_protocol_dp_analysis(u8 *par);
+
+    void lutec_ack_by_bt(uint8_t point_to, uint8_t ack_id, uint16_t sent_to_addr);
 
 #endif
 /***************************************File end********************************************/

@@ -12,9 +12,9 @@
 
 	void adc_gpio_ain_init(void);
 
-	void lux_adc_init(void);
+	void lutec_lux_init(void);
 
-
+    void lutec_lux_loop(void);
 #endif
 
 /***************************************File end********************************************/

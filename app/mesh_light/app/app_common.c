@@ -421,7 +421,7 @@ void app_tuya_vendor_set_light_data(uint16_t src_addr, uint16_t dst_addr, u8 *pa
                 //app_tuya_vendor_light_dp_data(par, par_len);
                 if((par[1] > 100) && (par[1] < 129))
                 {
-                    lutec_bluetooth_dp_data(par, par_len);
+                    lutec_bluetooth_dp_data(src_addr, dst_addr, par, par_len);
                 }
                 else
                 {

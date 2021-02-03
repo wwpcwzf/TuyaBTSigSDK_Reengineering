@@ -14,12 +14,17 @@
 
 
 
+    void lutec_set_address(u16 addr);
 
+    u16 lutec_get_address(void);
 
+    u8 lutec_is_own_group(u16 g_addr);
 
+    void lutec_join_group(u16 new_group);
 
+    void lutec_exit_group(u16 the_group);
 
-
+    void lutec_init_group(void);
 
 
 

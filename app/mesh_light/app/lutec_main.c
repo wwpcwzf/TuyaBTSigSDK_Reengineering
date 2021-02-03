@@ -9,11 +9,106 @@
 
 #include "lutec_main.h"
 
+
+#include "hal_uart.h"
+#include "ty_timer_event.h"
+
+
+
 #include "lutec_lux.h"
 #include "lutec_pir.h"
+#include "lutec_key.h"
+#include "lutec_led.h"
+#include "lutec_tick.h"
 
-
-
+static u16 self_address = 0;
+static u16 self_group_address_list[9] = {0};
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_set_address(u16 addr)
+{
+    self_address = addr;
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u16 lutec_get_address(void)
+{
+    return self_address;
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_is_own_group(u16 g_addr)
+{
+    u8 i = 0;
+    for(i = 0; i < self_group_address_list[0]; i++)
+    {
+        if(self_group_address_list[i] == g_addr)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_join_group(u16 new_group)
+{
+    u8 i = 0;
+    for(i = 0; i < self_group_address_list[0]; i++)
+    {
+        if(self_group_address_list[i] == new_group)
+        {
+            return;
+        }
+    }
+    self_group_address_list[self_group_address_list[0]] = new_group;
+    self_group_address_list[0] += 1;
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_exit_group(u16 the_group)
+{
+    u8 i = 0;
+    for(i = 0; i < self_group_address_list[0]; i++)
+    {
+        if(self_group_address_list[i] == the_group)
+        {
+            for( ; i < self_group_address_list[0]; i++)
+            {
+                self_group_address_list[i] = self_group_address_list[i + 1];
+            }
+        }
+    }
+    self_group_address_list[0] -= 1;
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_init_group(void)
+{
+    u8 i = 0;
+    for(i = 0; i < 8; i++)
+    {
+        self_group_address_list[i] == 0;
+    }
+}
 
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -22,10 +117,11 @@
 -------------------------------------------------------------------------*/
 void lutec_main_init(void)
 {
-
-	lutec_pir_set_pin_init();
-	lux_adc_init();
-
+    lutec_tick_start();
+	lutec_pir_init();
+    lutec_lux_init();
+    lutec_key_init();
+    lutec_led_init();
 }
 
 
@@ -43,8 +139,25 @@ void lutec_main_init(void)
 -------------------------------------------------------------------------*/
 void lutec_main_loop(void)
 {
+    static u8 duty_f = 0;
+    
 
-  
+    lutec_lux_loop();
+    lutec_key_loop();
+    lutec_pir_loop();
+
+    if(lutec_get_key_action() == 2)
+    {
+        lutec_led_trigger();
+        lutec_pir_set_sensitivity(duty_f++);
+        if(duty_f > 100)
+            duty_f = 0;
+
+        hal_uart_send(&duty_f, 1);
+    }
+
+    lutec_led_flash(1);
+    
 }
 
 

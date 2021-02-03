@@ -737,9 +737,9 @@ afe_0xF1
 		<5:4>   r_max_c[9:8]
 		<7:6>   r_max_mc[9:8]
 
-	r_max_mc[9:0]: serves to set length of ¡°capture¡± state for RNS and Misc channel.
-	r_max_c[9:0]:  serves to set length of ¡°capture¡± state for left and right channel.
-	r_max_s:       serves to set length of ¡°set¡± state for left, right and Misc channel.
+	r_max_mc[9:0]: serves to set length of ï¿½ï¿½captureï¿½ï¿½ state for RNS and Misc channel.
+	r_max_c[9:0]:  serves to set length of ï¿½ï¿½captureï¿½ï¿½ state for left and right channel.
+	r_max_s:       serves to set length of ï¿½ï¿½setï¿½ï¿½ state for left, right and Misc channel.
 
 	Note: State length indicates number of 24M clock cycles occupied by the state.
  *************************************************************************************/
@@ -760,7 +760,7 @@ enum{
 };
 
 /**
- * @brief      This function sets length of each ¡°set¡± state
+ * @brief      This function sets length of each ï¿½ï¿½setï¿½ï¿½ state
  * @param[in]  r_max_s - variable of length of "set" state
  * @return     none
  */
@@ -1087,7 +1087,7 @@ enum{
  */
 static inline unsigned short RNG_Read(void)
 {
-	#if 1
+  #if 1
 	return ( ReadAnalogReg(areg_adc_rng_h)<<8 |  ReadAnalogReg(areg_adc_rng_l) );
   #else
 	unsigned short tmp1,tmp2,RngValue;
@@ -1095,7 +1095,7 @@ static inline unsigned short RNG_Read(void)
 	tmp1 = ReadAnalogReg(0xf6);  //read
 	RngValue = (tmp1<<8) + tmp2;
 	return RngValue;
-   #endif
+  #endif
 }
 
 /**
