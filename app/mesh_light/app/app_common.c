@@ -487,7 +487,6 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
     uart_reply_addr = src_addr;
 
     APP_LOG_DUMP("recv data\r\n", data, data_len);
-    hal_uart_send(data, data_len);
 
     OPERATE_LIGHT opRet = 1;
     bool bActiveFlag = FALSE;
@@ -642,10 +641,17 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
             ty_light_scene_cmd_set_ttl(ttl);
 
             app_tuya_vendor_set_light_data(src_addr, dst_addr,&(*data), data_len);
+            //---------------------------------wwpc 20210204  取消自定义dp点的原包回复（默认sig mesh指令）
+            if((data[1] > 100) && (data[1] < 129))
+            {
+                break;
+            }
+
             if(TUYA_VD_TUYA_WTITE == opcode)
             {
                 tuya_mesh_data_send(dst_addr, src_addr, TUYA_VD_TUYA_DATA, &(*data), data_len, 0, 1);
             } 
+
             }
         break;
         case TUYA_VD_TUYA_READ:{ 

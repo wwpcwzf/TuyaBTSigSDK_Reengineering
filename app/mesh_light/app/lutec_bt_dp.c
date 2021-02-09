@@ -10,7 +10,11 @@
 
 #include "lutec_main.h"
 #include "lutec_wifi.h"
+#include "lutec_tick.h"
 
+#include "hal_uart.h"
+#include "app_common.h"
+#include "app_light_cmd.h"
 
 /*-------------------------------------------------------------------------
 *简  介: 自定义蓝牙数据点处理
@@ -33,13 +37,14 @@ void lutec_bluetooth_dp_data(u16 s_addr, u16 d_addr, u8 *par, int par_len)
     //0x04本地上行---不应收到此类数据帧
     //0x06转发---解析
     
+    
     if(par[4] == 0x04)//不应收到此类数据帧
     {
         return;
     }
 
     if(((par[4] == 0x01) || (par[4] == 0x03)) && (d_addr >= 0xc000))
-    {        
+    {   
         lutec_ack_by_bt(par[4], par[1], s_addr);
         par[4] = 0x06;//转发
         app_light_vendor_data_publish(d_addr, par, len_buf);
@@ -65,62 +70,45 @@ void lutec_bluetooth_dp_data(u16 s_addr, u16 d_addr, u8 *par, int par_len)
 /*-------------------------------------------------------------------------
 *简  介: 自定义蓝牙数据点指令解析
 *参  数: 参数指针[dpID | 数据类型 | 指令长度 | 指向 | 地址 | 指令参数]
+         下标     0        1         2       3      4 5   6.
 *返回值: 要回复的数据存储到参数指针指向处；
 *       返回回复参数的长度 > 6，反之不需要回复。
 -------------------------------------------------------------------------*/
 u8 lutec_protocol_dp_analysis(u8 *par)
 {
     u8 return_num = 0;
+    u16 addr_buf = ((uint16_t)par[4] << 8) + par[5];
 
     switch(par[0])
     {
         case 0x65://开关
-        #if 0
-            switch (par[6])
+            lutec_light_switch(par[6]);
+            if(addr_buf < 0xC000)
             {
-                case 0:
-                    app_light_ctrl_data_switch_set(0);
-                    app_light_ctrl_data_countdown_set(0);
-                    lutec_onoff_flag = 0;
-                    break;
-                case 1:
-                    app_light_ctrl_data_switch_set(1);
-                    app_light_ctrl_data_countdown_set(0);
-                    lutec_onoff_flag = 1;
-                    break;
-                case 2:
-                    app_light_ctrl_data_switch_set(1);
-                    app_light_ctrl_data_countdown_set(1000);
-                    lutec_onoff_flag = 2;
-                    break;
-                default:
-                    break;
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                par[6] = lutec_get_switch_flag();
+                return_num = 7;
             }
-            app_light_ctrl_data_auto_save_start(5000);
-            app_light_ctrl_proc();
-
-            if((((uint16_t)par[4] << 8) + par[5]) < 0xC000)//点播---回复
-            {
-                par[1] = 0x00;              
-                par[2] = 0x04;
-                par[6] = lutec_onoff_flag;
-                if((par[3] == 0x01) || (par[3] == 0x03))
-                {
-                    par[3] = par[3] + 1; 
-                    return 7;
-                }
-                else
-                {
-                    return 0;
-                } 
-            }
-        #endif
             break;
         case 0x66://灯光调节
-            //sys_execution_0x66();
+            lutec_light_dimmer(&par[6]);
+            if(addr_buf < 0xC000)
+            {
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                return_num = lutec_get_dimming_para(&par[6]) + 6;
+                par[2] = return_num - 3;
+            }    
             break;
         case 0x6A://延时调光
-            //sys_execution_0x6A();
+            hal_uart_send(par, par[2] + 3);
+            lutec_light_delay_dimmer(&par[6]);
+            if(addr_buf < 0xC000)
+            {
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                return_num = lutec_get_delay_dimming_para(&par[6]) + 6;
+                par[2] = return_num - 3;
+            }            
+            hal_uart_send(par, par[2] + 3);
             break;
         case 0x6B://wifi配网
             //sys_execution_0x6B();
@@ -220,6 +208,295 @@ void lutec_ack_by_bt(uint8_t point_to, uint8_t ack_id, uint16_t sent_to_addr)
 
     app_light_vendor_data_publish(sent_to_addr, data_buffer, 9);
 }
+
+static u8 switch_flag = 0;
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_light_switch(u8 switch_v)
+{
+    switch(switch_v) 
+    {
+    case 0:
+        app_light_ctrl_data_switch_set(0);
+        app_light_ctrl_data_countdown_set(0);
+        switch_flag = 0;
+        break;
+    case 1:
+        app_light_ctrl_data_switch_set(1);
+        app_light_ctrl_data_countdown_set(0);
+        switch_flag = 1;
+        break;
+    //case 2:
+        //app_light_ctrl_data_switch_set(1);
+        //app_light_ctrl_data_countdown_set(3000);
+        //break;
+    default:
+        app_light_ctrl_data_switch_set(1);
+        app_light_ctrl_data_countdown_set(3);
+        switch_flag = 2;
+        break;
+    }
+    //app_light_ctrl_data_auto_save_start(5000);
+    app_light_ctrl_proc();
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_get_switch_flag(void)
+{
+    return switch_flag;
+}
+
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_light_dimmer(u8* para_ptr)
+{
+    u16 buffer16_v = 0;
+
+    switch(para_ptr[0] > 0x40 ? (para_ptr[0] & 0x0F) + ((para_ptr[3] & 0xF0) >> 2) : para_ptr[0])
+    {
+    case 0x11://色温调光
+        buffer16_v = ((u16)para_ptr[1] << 8) + para_ptr[2];
+        if(buffer16_v == 0)
+        {
+            app_light_ctrl_data_switch_set(0);
+            app_light_ctrl_data_countdown_set(0);
+        }
+        else
+        {
+            if(buffer16_v > 1000)  buffer16_v = 1000;
+            app_light_ctrl_data_switch_set(1);
+            app_light_ctrl_data_countdown_set(0);
+            app_light_ctrl_data_temperature_set(buffer16_v);
+        }
+        break;
+    case 0x12://亮度调光    
+        buffer16_v = ((u16)para_ptr[1] << 8) + para_ptr[2];
+        if(buffer16_v == 0)
+        {
+            app_light_ctrl_data_switch_set(0);
+            app_light_ctrl_data_countdown_set(0);
+        }
+        else
+        {
+            if(buffer16_v > 1000)  buffer16_v = 1000;
+            app_light_ctrl_data_switch_set(1);
+            app_light_ctrl_data_countdown_set(0);
+            app_light_ctrl_data_bright_set(buffer16_v);
+        }    
+        break;
+    case 0x13://亮度色温调光
+        //app_light_ctrl_data_mode_set(WHITE_MODE);
+        buffer16_v = ((u16)para_ptr[1] << 8) + para_ptr[2];
+        if(buffer16_v == 0)
+        {
+            app_light_ctrl_data_switch_set(0);
+            app_light_ctrl_data_countdown_set(0);
+        }
+        else
+        {
+            if(buffer16_v > 1000)  buffer16_v = 1000;
+            app_light_ctrl_data_switch_set(1);
+            app_light_ctrl_data_countdown_set(0);
+            app_light_ctrl_data_bright_set(buffer16_v);
+            buffer16_v = ((u16)para_ptr[3] << 8) + para_ptr[4];
+            if(buffer16_v > 1000) buffer16_v = 1000;
+            app_light_ctrl_data_temperature_set(buffer16_v);
+        }        
+        break;
+    case 0x1A://HSV调光
+        break;
+    case 0x1B://RGB调光                
+        break;    
+    case 0x1C://关灯
+        app_light_ctrl_data_switch_set(0);
+        app_light_ctrl_data_countdown_set(0);
+    break;
+    case 0x1D://开灯   
+        app_light_ctrl_data_switch_set(0);
+        app_light_ctrl_data_countdown_set(0);        
+    break;
+    case 0x2A://亮度色温+HSV调光
+    break;                
+    case 0x2B://亮度色温+RGB调光
+    break;
+    default:
+    break;
+    }
+    app_light_ctrl_proc();
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_get_dimming_para(u8* get_ptr)
+{
+    u16 buffer16_v = 0;
+
+    switch(get_ptr[0])
+    {
+    case 0x01://色温调光
+        buffer16_v = app_light_ctrl_data_temperature_get();
+        get_ptr[1] = (u8)(buffer16_v >> 8);    
+        get_ptr[2] = (u8)(buffer16_v >> 0);
+        return 3;
+    case 0x02://亮度调光
+        buffer16_v = app_light_ctrl_data_bright_get();
+        get_ptr[1] = (u8)(buffer16_v >> 8);    
+        get_ptr[2] = (u8)(buffer16_v >> 0);
+        return 3;
+    case 0x13://亮度色温调光    
+        buffer16_v = app_light_ctrl_data_bright_get();
+        get_ptr[1] = (u8)(buffer16_v >> 8);    
+        get_ptr[2] = (u8)(buffer16_v >> 0);
+        buffer16_v = app_light_ctrl_data_temperature_get();
+        get_ptr[3] = (u8)(buffer16_v >> 8);    
+        get_ptr[4] = (u8)(buffer16_v >> 0);
+        return 5;
+    case 0x0C://关灯
+        return 0;
+    case 0x0D://开灯
+        return 0;
+    //case 0x0A://HSV调光
+        //return 0;
+    //case 0x0B://RGB调光
+        //return 0;
+    //case 0x0A://亮度色温+HSV调光
+        //return 0;
+    //case 0x0B://亮度色温+RGB调光
+        //return 0;
+    default:   
+        get_ptr[0] = 0x13;
+        buffer16_v = app_light_ctrl_data_bright_get();
+        get_ptr[1] = (u8)(buffer16_v >> 8);    
+        get_ptr[2] = (u8)(buffer16_v >> 0);
+        buffer16_v = app_light_ctrl_data_temperature_get();
+        get_ptr[3] = (u8)(buffer16_v >> 8);    
+        get_ptr[4] = (u8)(buffer16_v >> 0);
+        return 5;
+    }
+}
+
+static u32 delay_time = 0;
+static u8 delay_target_para[11] = {0};
+static u32 delay_time_base = 0;
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_delay_dim_loop(void)
+{
+
+
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_get_dim_para_len(u8 dim_flag)
+{
+    switch(dim_flag)
+    {
+        case 0x11:
+        case 0x12:
+        case 0x41:
+        case 0x42:
+            return 3;
+        case 0x13:
+        case 0x43:
+            return 5;
+        case 0x1A:
+        case 0x1B:
+        case 0x4A:
+        case 0x4B:
+            return 7;
+        case 0x2A:
+        case 0x2B:
+        case 0x8A:
+        case 0x8B:
+            return 11;
+        case 0x1C:
+        case 0x1D:
+        case 0x4C:
+        case 0x4D:
+        default:
+            return 1;
+    }
+}
+
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_light_delay_dimmer(u8* para_p)
+{
+    //延时时间
+    delay_time = ((u32)para_p[0] << 16) + ((u32)para_p[1] << 8) + para_p[2];
+    if(delay_time > 86400)
+    {
+        delay_time = 0;
+    }
+    
+    //保存参数
+    if(para_p[3] > 0x40)//先等待再调光
+    {
+        u8 para_l = lutec_get_dim_para_len(para_p[3]);
+        for(u8 i = 0; i < para_l; i++)
+        {
+            delay_target_para[i] = para_p[3 + i];
+        }
+    }
+    else //先调光在等待关灯
+    {
+        lutec_light_dimmer(&para_p[3]);
+        delay_target_para[0] = 0x1C;//关灯
+    }
+
+    //延时时基
+    if((para_p[3] == 0x4C) || (para_p[3] == 0x4D))
+    {
+        app_light_ctrl_data_countdown_set(delay_time);
+        delay_time_base = 0;
+    } 
+    else
+    {
+        delay_time_base = lutec_get_tick_10ms();
+    }   
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_get_delay_dimming_para(u8* get_p)
+{
+
+    return lutec_get_dim_para_len(get_p[3]);
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -46,7 +46,7 @@ int lutec_tick_callback(void)
 -------------------------------------------------------------------------*/
 u32 lutec_get_tick_10ms(void)
 {
-    return tick_counter;
+    return tick_counter == 0 ? 1 : tick_counter;
 }
 
 

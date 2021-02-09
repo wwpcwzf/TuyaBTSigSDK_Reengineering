@@ -10,6 +10,8 @@
 #include "lutec_main.h"
 
 
+
+
 #include "hal_uart.h"
 #include "ty_timer_event.h"
 
@@ -23,6 +25,11 @@
 
 static u16 self_address = 0;
 static u16 self_group_address_list[9] = {0};
+
+
+
+
+
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: 
@@ -122,6 +129,7 @@ void lutec_main_init(void)
     lutec_lux_init();
     lutec_key_init();
     lutec_led_init();
+    
 }
 
 
