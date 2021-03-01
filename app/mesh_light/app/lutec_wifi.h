@@ -28,14 +28,18 @@
 
 
 
-    u8 lutec_check_sum(u8* data, u8 len);
 
 
+    void lutec_set_wifi_config_flag(u8 f_v);
 
 	void lutec_uart_server_run(void);
 
 
 	void lutec_wifi_module_data(u8* cmd_ptr, u8 para_l);
+
+    u8 lutec_get_wifi_state(void);
+
+    void lutec_reset_wifi_module(void);
 
 	void lutec_remote_bluetooth_data(u8* data_ptr, u8 data_l);
 

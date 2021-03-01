@@ -11,7 +11,7 @@
 	#include "tuya_sigmesh_hal.h"
 	#include "ty_light_save_user_flash.h"
 
-
+    #include "lutec_config.h"
 
 
     void lutec_set_address(u16 addr);
@@ -33,6 +33,10 @@
 	void lutec_main_init(void);
 
 	void lutec_main_loop(void);
+
+    void lutec_device_loop(void);
+    
+    void lutec_config_close_callback(void);
 
 	void lutec_mesh_state_callback(mesh_state_t m_state);
 

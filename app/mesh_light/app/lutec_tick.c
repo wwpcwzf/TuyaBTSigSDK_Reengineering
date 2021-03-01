@@ -23,7 +23,7 @@ static u32 tick_counter = 0;//10ms分辨率
 -------------------------------------------------------------------------*/
 void lutec_tick_start(void)
 {
-    ty_timer_event_add(lutec_tick_callback, 9999);  
+    ty_timer_event_add(lutec_tick_callback, 9999);  //10ms
 }
 
 

@@ -36,6 +36,8 @@ void lutec_pir_set_pin_init(void);
 
 void lutec_pir_set_sensitivity(u8 percent);
 
+u8 lutec_pir_get_sensitivity(void);
+
 #endif
 
 

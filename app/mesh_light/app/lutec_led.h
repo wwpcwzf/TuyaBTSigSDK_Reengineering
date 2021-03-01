@@ -17,7 +17,9 @@ void lutec_led_onoff(u8 onoff);
 
 void lutec_led_trigger(void);
 
-void lutec_led_flash(u8 enbale_v);
+void lutec_led_loop(void);
+
+void lutec_led_flash_set(u8 interval_time);
 
 #endif
 

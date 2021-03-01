@@ -9,6 +9,8 @@
 
 #include "lutec_wifi.h"
 
+#include "lutec_config.h"
+
 #include "lutec_main.h"
 #include "lutec_bt_dp.h"
 
@@ -16,21 +18,22 @@
 #include "hal_uart.h"
 #include "ty_fifo.h"
 
+static u8 wifi_state = 0;
+static u8 wifi_config_flag = 0; //0：未动作；1：查询；2：配网
+
+
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: 
 *返回值: 
 -------------------------------------------------------------------------*/
-u8 lutec_check_sum(u8* data, u8 len)
+void lutec_set_wifi_config_flag(u8 f_v)
 {
-	u8 i, sum = 0;
-	for(i = 0; i < len; i++)
-	{
-		sum += data[i];
-	}
-	return sum;
+    if(wifi_config_flag != f_v)
+    {
+        wifi_config_flag = f_v;
+    }
 }
-
 
 
 
@@ -128,6 +131,29 @@ void lutec_wifi_module_data(u8* cmd_ptr, u8 para_l)
 		break;
 	}
 }
+
+
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_get_wifi_state(void)
+{
+    return wifi_state;
+}
+
+
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_reset_wifi_module(void)
+{
+    
+}
+
 
 /*-------------------------------------------------------------------------
 *简  介: 蓝牙远程下行数据处理：解析自己的点播指令，其余转发。

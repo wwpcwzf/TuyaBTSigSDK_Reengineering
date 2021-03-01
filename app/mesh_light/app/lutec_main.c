@@ -22,10 +22,11 @@
 #include "lutec_key.h"
 #include "lutec_led.h"
 #include "lutec_tick.h"
+#include "lutec_wifi.h"
+
 
 static u16 self_address = 0;
 static u16 self_group_address_list[9] = {0};
-
 
 
 
@@ -133,13 +134,6 @@ void lutec_main_init(void)
 }
 
 
-
-
-
-
-
-
-
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: 
@@ -147,27 +141,58 @@ void lutec_main_init(void)
 -------------------------------------------------------------------------*/
 void lutec_main_loop(void)
 {
-    static u8 duty_f = 0;
-    
-
     lutec_lux_loop();
     lutec_key_loop();
     lutec_pir_loop();
+    lutec_led_loop();
 
-    if(lutec_get_key_action() == 2)
+    lutec_device_loop();    
+}
+
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_device_loop(void)
+{
+    //---------------------------------------按键
+    switch(lutec_get_key_action())
     {
-        lutec_led_trigger();
-        lutec_pir_set_sensitivity(duty_f++);
-        if(duty_f > 100)
-            duty_f = 0;
-
-        hal_uart_send(&duty_f, 1);
+        case 1://短按
+            lutec_led_trigger();
+            break;
+        case 2://长按
+            kick_out();//蓝牙重置reg_pwdn_ctrl |= FLD_PWDN_CTRL_REBOOT;            
+            break;
+        default:
+            break;
     }
+    //---------------------------------------重置
+    lutec_device_reset();
+    //---------------------------------------照度
 
-    lutec_led_flash(1);
+
+    //---------------------------------------延时
+    lutec_delay_dim_loop();
+
+    //---------------------------------------WiFi
+    
+    // lutec_pir_set_sensitivity(duty_f++);
+    // hal_uart_send(&duty_f, 1);
     
 }
 
+/*-------------------------------------------------------------------------
+*简  介: 蓝牙不配网使用---长灭
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_config_close_callback(void)
+{
+    lutec_led_flash_set(0);//不闪
+    lutec_led_onoff(0);//关灯
+}
 
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -178,35 +203,41 @@ void lutec_mesh_state_callback(mesh_state_t m_state)
 {
   switch(m_state) 
   {
-    case NODE_POWER_ON_UNPROVISION: //
+    case NODE_POWER_ON_UNPROVISION: //上电未配网
+        lutec_led_flash_set(50);//快闪0.5s
+        break;
+    case NODE_POWER_ON_IN_MESH://上电已配网    
+        //break;
+    case NODE_PROVISION_SUCCESS://配网成功    
+        if(lutec_get_wifi_state() == 0x74)//wifi联网成功
+        {   //常亮         
+            lutec_led_flash_set(0);
+            lutec_led_onoff(1);
+        }
+        else
+        {
+            lutec_led_flash_set(100);//慢闪1s
+        }
+        break;
+    case NODE_KICK_OUT://重置完成
+        lutec_reset_wifi_module();//重置WiFi模块
+        lutec_led_flash_set(50);//快闪0.5s
+    break;
+    case NODE_MESH_RESET://mesh网络重置 --？
+        lutec_led_flash_set(50);//快闪0.5s   
+    break;
+    case NODE_RECOVER_IN_MESH://恢复网络
     
     break;
-    case NODE_POWER_ON_IN_MESH:
-    
-    break;
-    case NODE_PROVISION_SUCCESS:
-    
-    break;
-    case NODE_KICK_OUT:
-    
-    break;
-    case NODE_MESH_RESET:
-    
-    break;
-    case NODE_RECOVER_IN_MESH:
-    
-    break;
-    case TY_OTA_START:
-    
+    case TY_OTA_START:    
     break;
     case TY_OTA_SUCCESS:
-    case TY_OTA_FAIL:
+    case TY_OTA_FAIL:    
+    break;
+    case TY_GROUP_SUB_ADD://加入组
     
     break;
-    case TY_GROUP_SUB_ADD:
-    
-    break;
-    case TY_GROUP_SUB_DEL:
+    case TY_GROUP_SUB_DEL://退出组
     
     break;
     default:

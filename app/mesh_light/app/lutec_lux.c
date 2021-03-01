@@ -8,7 +8,7 @@
 
 #include "lutec_lux.h"
 #include "adc.h"
-#include "hal_uart.h"
+#include "hal_uart.h" //hal_uart_send(databuf, 4);
 
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -78,40 +78,110 @@ void lutec_lux_init(void)
 ////////////////////////////////////////////////////////////////////////////////////////
 }
 
-/*
-#define    areg_adc_misc_l      0xf7
-#define    areg_adc_misc_h      0xf8
-enum{
-	FLD_ADC_MISC_DATA   	= 	BIT_RNG(0,6),
-	FLD_ADC_MISC_VLD    	= 	BIT(7),
-};*/
+
+//-------------------------------------------------------------------------
+static u8 lux_flag = 0;
+static u8 lux_threshold = 870;//30% -- 30*29 = 870
+
+/*-------------------------------------------------------------------------
+*简  介: 获取AD采样值--滤波--判断--修改标志
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
 void lutec_lux_loop(void)
 {
-    u8 databuf[4] = {0};
+    static u16 now_lux_ad = 0;
+    static u32 sum_lux_ad = 0;
+    static u8 average_counter = 0;
+    static u8 buffeting_counter = 0;
+    u16 databuf = 0;
 
-    databuf[0] = analog_read(areg_adc_misc_h);
-    databuf[1] = analog_read(areg_adc_misc_l);
+    databuf = (analog_read(areg_adc_misc_h) << 8) + analog_read(areg_adc_misc_l);
 
-    if(databuf[0] & 0xE0)
+    if(databuf & 0x8000)//转换完成（最高位为标记位）
     {
-        databuf[2] = 0x0D;
-        databuf[3] = 0x0A;
-        //hal_uart_send(databuf, 4);
-        databuf[0] = 0x00;
-    }
-    
+        databuf &= 0x7FFF;
+        //平均值滤波
+        if(average_counter < 64)
+        {
+            sum_lux_ad += databuf;
+            average_counter++;
+            return;
+        }
+        else
+        {
+            average_counter = 0;
+            databuf = (u16)(sum_lux_ad >> 6);
+            sum_lux_ad = 0;
+        }
+        //消抖滤波
+        if(now_lux_ad == databuf)
+        {
+            buffeting_counter = 0;
+        }
+        else
+        {
+            if(buffeting_counter++ > 3)
+            {
+                now_lux_ad = databuf;
+                buffeting_counter = 0;
+            }
+        }
+        //阈值判断  now_lux_ad = {46--2611}
+        if(lux_flag == 0)//未使能
+        {
+            if(now_lux_ad > (lux_threshold + 5))//暗了
+            {
+                lux_flag = 1;
+            }
+        }
+        else //已使能
+        {
+            if(now_lux_ad < lux_threshold)
+            {
+                lux_flag = 0;
+            }
+        }
+        //hal_uart_send(&now_lux_ad, 2);
+    }    
 }
 
 
 
+/*-------------------------------------------------------------------------
+*简  介: 获取lux判断标志
+*参  数: 
+*返回值: 0：失能；1：使能；
+-------------------------------------------------------------------------*/
+u8 lutec_get_lux_flag(void)
+{
+    return lux_flag;
+}
 
 
 
+/*-------------------------------------------------------------------------
+*简  介:  设置阈值
+*         lux AD： 11.5位 = 2896.3
+*         实际AD： 最亮 34---最暗2640
+*         阈值AD： 使能  0---失能2900
+*参  数:  thsd_v：使能100%---失能0%
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_set_lux_threshold(u8 thsd_v)
+{
+    lux_threshold = thsd_v > 100 ? 0 : (100 - thsd_v) * 29;
+}
 
-
-
-
-
+/*-------------------------------------------------------------------------
+*简  介:  获取lux阈值(AD)
+*参  数:
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_get_lux_threshold(void)
+{
+    return (100 - (u8)(lux_threshold / 29));
+}
 
 
 

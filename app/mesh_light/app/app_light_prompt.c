@@ -445,7 +445,7 @@ static OPERATE_LIGHT app_light_prompt_ctrl_auto_stop(void)
     return LIGHT_OK;
 }
 
-
+//app_light_prompt_ctrl_auto_start
 void app_light_ctrl_prompt_start(void)
 {
     OPERATE_LIGHT opRet = 1;

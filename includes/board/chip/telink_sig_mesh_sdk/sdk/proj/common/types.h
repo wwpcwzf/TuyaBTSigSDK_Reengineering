@@ -24,25 +24,28 @@
 #pragma once
 #include <stddef.h>  /* size_t */
 #include <stdbool.h>
-typedef unsigned char u8 ;
-typedef signed char s8;
 
-typedef unsigned short int u16;
-typedef signed short int s16;
 
-typedef int s32;
-typedef unsigned int u32;
 
-typedef long long s64;
-typedef unsigned long long u64;
+typedef unsigned char         u8 ;
+typedef signed char           s8;
 
-typedef unsigned char           word8;	
-typedef unsigned short          word16;	
-typedef unsigned long           word32;
+typedef unsigned short int    u16;
+typedef signed short int      s16;
 
-typedef unsigned char           uint8_t;	
-typedef unsigned short          uint16_t;	
-typedef unsigned long           uint32_t;
+typedef int                   s32;
+typedef unsigned int          u32;
+
+typedef long long             s64;
+typedef unsigned long long    u64;
+
+typedef unsigned char         word8;	
+typedef unsigned short        word16;	
+typedef unsigned long         word32;
+
+typedef unsigned char         uint8_t;	
+typedef unsigned short        uint16_t;	
+typedef unsigned long         uint32_t;
 
 typedef signed char           int8_t;	
 typedef signed short          int16_t;	
@@ -50,17 +53,18 @@ typedef signed long           int32_t;
 
 
 #ifndef NULL
-#define NULL 	0
+    #define NULL 	0
 #endif
 
 #ifndef __cplusplus
 //typedef u8 bool;
 
 #ifndef FALSE
-#define FALSE 	0
+    #define FALSE 	0
 #endif
+
 #ifndef TRUE
-#define TRUE 	(!FALSE)
+    #define TRUE 	(!FALSE)
 #endif
 
 //#define false 	FALSE
@@ -71,7 +75,7 @@ typedef signed long           int32_t;
 // There is no way to directly recognise whether a typedef is defined
 // http://stackoverflow.com/questions/3517174/how-to-check-if-a-datatype-is-defined-with-typedef
 #ifdef __GNUC__
-typedef	u16	wchar_ts;		
+    typedef	u16	wchar_ts;		
 #endif
 
 #define U32_MAX ((u32)0xffffffff)

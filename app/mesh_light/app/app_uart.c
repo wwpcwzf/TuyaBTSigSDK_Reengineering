@@ -127,10 +127,12 @@ void app_uart_run(void){
     u8 buf[254];
     int len = hal_uart_read(buf,254);
 
-    if(len > 0){
+    if(len > 0)
+    {
         ty_fifo_add(buf,len);
         PR_DEBUG("%-30s","RECEIVE RAW DATA:");
-        for(u8 i=0;i<len;i++){
+        for(u8 i=0;i<len;i++)
+        {
             PR_DEBUG_RAW("%02X ",buf[i]&0xFF); 
         }
         PR_DEBUG_RAW("\n");

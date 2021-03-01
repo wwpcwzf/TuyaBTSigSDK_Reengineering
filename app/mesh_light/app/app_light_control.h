@@ -57,6 +57,8 @@ extern LIGHT_CTRL_DATA_T tLightCtrlData;
  */
 OPERATE_LIGHT app_light_ctrl_proc(void);
 
+
+
 /**
  * @brief: light ctrl disable
  * @param {none}

@@ -92,16 +92,21 @@ static void app_light_vendor_group_addr_inquire(uint16_t src_addr, uint16_t dst_
     ty_timer_event_add(app_light_group_addr_inquire_callback,dealy*30*1000);//window 3s / 100device 30ms
 }
 
-int mesh_app_close_config_network_callback(){
+int mesh_app_close_config_network_callback()
+{
     static u8 cnt = 1;
     TY_LOG_DEBUG("mesh_app_close_config_network_callback:%d\r\n",cnt);
 
     if(1 == get_if_prov_success()){
         return -1;
     }
-
-    if(cnt >= 10){
+    //--------------------------------------wwpc 20210224
+    //if(cnt >= 10)
+    if(cnt >= MESH_CONFIG_TIME)
+    {
         tuya_gatt_adv_beacon_enable(0);
+        //--------------------------------------wwpc 20210224
+        lutec_config_close_callback();
         return -1;
     }
     else{
@@ -112,7 +117,8 @@ int mesh_app_close_config_network_callback(){
 
 void mesh_app_close_config_network_init(void){
 
-    if(0 == get_if_prov_success()){
+    if(0 == get_if_prov_success())
+    {
         ty_timer_event_add(mesh_app_close_config_network_callback, 60*1000*1000);
     }
 }
@@ -285,19 +291,19 @@ void mesh_state_callback(mesh_state_t stat){
         switch(stat) 
         {
             case NODE_POWER_ON_UNPROVISION:
-                    app_light_ctrl_prompt_start();
+                app_light_ctrl_prompt_start();
                 break;
             case NODE_POWER_ON_IN_MESH:
                 break;
             case NODE_PROVISION_SUCCESS:
-                    app_light_ctrl_prompt_stop();
-                    ty_light_join_network_success();
+                app_light_ctrl_prompt_stop();
+                ty_light_join_network_success();
                 break;
             case NODE_KICK_OUT:
-                    app_light_ctrl_prompt_start();
+                app_light_ctrl_prompt_start();
                 break;
             case NODE_MESH_RESET:
-                    app_light_ctrl_prompt_start();
+                app_light_ctrl_prompt_start();
                 break;
             case NODE_RECOVER_IN_MESH:
                 break;
