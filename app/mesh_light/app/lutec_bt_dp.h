@@ -77,6 +77,10 @@
 
     u8 lutec_get_env_illum_conf(u8* gs_p);
 
+    void lutec_device_addr_control(u8* para_p, u16 s_addr, u8 para_l);
+    
+    u8 lutec_get_ack_addr(u8* save_ptr);
+
 #endif
 /***************************************File end********************************************/
 

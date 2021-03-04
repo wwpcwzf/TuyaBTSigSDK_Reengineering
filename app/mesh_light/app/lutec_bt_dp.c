@@ -227,7 +227,6 @@ u8 lutec_protocol_dp_analysis(u8 *par)
             }
             break;
         case 0x73://环境照度 
-            hal_uart_send(par, par[2] + 3); 
             if(par[2] == 5)
             {
                 lutec_env_illum_set(&par[6]);
@@ -238,7 +237,6 @@ u8 lutec_protocol_dp_analysis(u8 *par)
                 return_num = lutec_get_env_illum_conf(&par[6]) + 6;
                 par[2] = return_num - 3;
             }                 
-            hal_uart_send(par, par[2] + 3);
             break;
         case 0x74://环境湿度                       
             if(addr_buf < 0xC000)
@@ -330,9 +328,19 @@ u8 lutec_protocol_dp_analysis(u8 *par)
             break;
         //case 0x7C://应答
         //break;
-        case 0x7D://注册指令（设置地址，分组）
-        
-            //sys_execution_0x7D();
+        case 0x7D://注册指令（设置地址，分组） 
+            hal_uart_send(par, par[2] + 3); 
+            if(par[2] == 5)
+            {
+                lutec_device_addr_control(&par[6], addr_buf, par[2] - 3);
+            }
+            if(addr_buf < 0xC000)
+            {
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                return_num = lutec_get_ack_addr(&par[6]) + 6;
+                par[2] = return_num - 3;
+            }                 
+            hal_uart_send(par, par[2] + 3);
             break;
         case 0x7E://设备识别号
             //sys_execution_0x7E();
@@ -1262,7 +1270,68 @@ u8 lutec_get_env_illum_conf(u8* gs_p)
 
 
 
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_device_addr_control(u8* para_p, u16 s_addr, u8 para_l)
+{
+    u16 buf16_v = 0;
+    switch(para_p[0])
+    {
+        case 1://注册
+            if(para_l == 3)//长度
+            {
+                buf16_v = ((u16)para_p[1] << 8) + para_p[2];
+                if((s_addr < 0xC000) && (buf16_v < 0xC000))//点播&&节点地址
+                {
+                    lutec_set_address(buf16_v);
+                }
+            }
+        break;
+        case 2://加入组
+            if((para_l >= 3) && (((para_l - 1) % 2) == 0))
+            {
+                u8 group_num = (para_l - 1) / 2;
+                for(u8 sub_n = 0; sub_n < group_num; sub_n++)
+                {
+                     buf16_v = ((u16)para_p[1 + sub_n] << 8) + para_p[2 + sub_n];
+                     if(buf16_v >= 0xC000)
+                     {
+                        lutec_join_group(buf16_v);
+                     }
+                }               
+            }
+        break;
+        case 3://退出组
+            if((para_l >= 3) && (((para_l - 1) % 2) == 0))
+            {
+                u8 group_num = (para_l - 1) / 2;
+                for(u8 sub_n = 0; sub_n < group_num; sub_n++)
+                {
+                     buf16_v = ((u16)para_p[1 + sub_n] << 8) + para_p[2 + sub_n];
+                     if(buf16_v >= 0xC000)
+                     {
+                        lutec_exit_group(buf16_v);
+                     }
+                }               
+            }
+        break;
+        default:
+        break;
+    }
+}
+            
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_get_ack_addr(u8* save_ptr)
+{
 
+}
 
 
 

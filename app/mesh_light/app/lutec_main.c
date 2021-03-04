@@ -38,7 +38,10 @@ static u16 self_group_address_list[9] = {0};
 -------------------------------------------------------------------------*/
 void lutec_set_address(u16 addr)
 {
-    self_address = addr;
+    if(self_address != addr)
+    {
+        self_address = addr;
+    }
 }
 /*-------------------------------------------------------------------------
 *简  介: 
