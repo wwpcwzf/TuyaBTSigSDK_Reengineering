@@ -513,11 +513,12 @@ OPERATE_LIGHT app_light_ctrl_data_auto_save(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
             #endif
             #if (LIGHT_CFG_3IN1_SAVE == 1) 
                 ty_light_save_user_flash_open_appdata();
-                ty_light_save_user_flash_write_3in1_data(TYPE_APP_DATA,&tSaveAppData);
+                opRet = ty_light_save_user_flash_write_3in1_data(TYPE_APP_DATA,&tSaveAppData);
                 ty_light_save_user_flash_close_appdata();
             #else
-                ty_light_save_user_flash_write_data(TYPE_APP_DATA,&tSaveAppData);
+                opRet = ty_light_save_user_flash_write_data(TYPE_APP_DATA,&tSaveAppData);
             #endif
+                //hal_uart_send(&opRet, 4);
             }
             break;
 		case TYPE_MDEV_DATA:{ 
@@ -528,10 +529,10 @@ OPERATE_LIGHT app_light_ctrl_data_auto_save(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
                 tSaveMdevData.usAgingTestedTime = tProdResult.usAgingTestedTime;
             #if (LIGHT_CFG_3IN1_SAVE == 1)  
                 ty_light_save_user_flash_open_appdata();
-                ty_light_save_user_flash_write_3in1_data(TYPE_MDEV_DATA,&tSaveMdevData);
+                opRet = ty_light_save_user_flash_write_3in1_data(TYPE_MDEV_DATA,&tSaveMdevData);
                 ty_light_save_user_flash_close_appdata();
             #else
-                ty_light_save_user_flash_write_data(TYPE_MDEV_DATA,&tSaveMdevData);
+                opRet = ty_light_save_user_flash_write_data(TYPE_MDEV_DATA,&tSaveMdevData);
             #endif
             }
             break;
@@ -549,11 +550,12 @@ OPERATE_LIGHT app_light_ctrl_data_auto_save(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
                 tSaveMemData.usSyncGroupAddr = ty_light_scene_cmd_get_groupid();
             #if (LIGHT_CFG_3IN1_SAVE == 1)  
                 ty_light_save_user_flash_open_appdata();
-                ty_light_save_user_flash_write_3in1_data(TYPE_MEM_DATA,&tSaveMemData); 
+                opRet = ty_light_save_user_flash_write_3in1_data(TYPE_MEM_DATA,&tSaveMemData); 
                 ty_light_save_user_flash_close_appdata();
             #else
-                ty_light_save_user_flash_write_data(TYPE_MEM_DATA,&tSaveMemData); 
+                opRet = ty_light_save_user_flash_write_data(TYPE_MEM_DATA,&tSaveMemData); 
             #endif       			
+                //hal_uart_send(&opRet, 4);
             }
             break;
 		case TYPE_FAV_FST_DATA:
@@ -576,27 +578,28 @@ OPERATE_LIGHT app_light_ctrl_data_auto_save(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
                 tSaveFavData.usValue =  tLightCtrlData.tColorOrigin.usValue;
             #if (LIGHT_CFG_3IN1_SAVE == 1) 
                 ty_light_save_user_flash_open_appdata();
-                ty_light_save_user_flash_write_3in1_data(eDataType,&tSaveFavData);
+                opRet = ty_light_save_user_flash_write_3in1_data(eDataType,&tSaveFavData);
                 ty_light_save_user_flash_close_appdata();
             #else
-                ty_light_save_user_flash_write_data(eDataType,&tSaveFavData);
+                opRet = ty_light_save_user_flash_write_data(eDataType,&tSaveFavData);
             #endif
             }
             break;
 		case TYPE_USER_DATA:{ 
-                LIGHT_CUST_DATA_FLASH_T tSaveCustData;
-                memset(&tSaveCustData, 0, sizeof(LIGHT_CUST_DATA_FLASH_T));
-                //------------------------------------------wwpc  20210129
-                lutec_save_data_set_variable_callback(&tSaveCustData);
+            //     LIGHT_CUST_DATA_FLASH_T tSaveCustData;
+            //     memset(&tSaveCustData, 0, sizeof(LIGHT_CUST_DATA_FLASH_T));
+            //     //------------------------------------------wwpc  20210129
+            //     lutec_save_data_set_variable_callback(&tSaveCustData);
 
-            #if (LIGHT_CFG_3IN1_SAVE == 1) 
-                ty_light_save_user_flash_open_appdata();
-                ty_light_save_user_flash_write_3in1_data(TYPE_USER_DATA,&tSaveCustData);
-                ty_light_save_user_flash_close_appdata();
-            #else
-                ty_light_save_user_flash_write_data(TYPE_USER_DATA,&tSaveCustData);
-            #endif
-            }
+            // #if (LIGHT_CFG_3IN1_SAVE == 1) 
+            //     ty_light_save_user_flash_open_appdata();
+            //     opRet = ty_light_save_user_flash_write_3in1_data(TYPE_USER_DATA,&tSaveCustData);
+            //     ty_light_save_user_flash_close_appdata();
+            // #else
+            //     opRet = ty_light_save_user_flash_write_data(TYPE_USER_DATA,&tSaveCustData); 
+            // #endif 
+            //     hal_uart_send(&opRet, 4);
+             }
 		    break;
 		default:
 		    break;
@@ -617,6 +620,7 @@ OPERATE_LIGHT app_light_ctrl_data_auto_read(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
             #else
                 opRet = ty_light_save_user_flash_read_data(TYPE_MDEV_DATA,&tReadMdevData);
             #endif
+
                 if( LIGHT_OK != opRet ) {
                     TY_LOG_ERR("Read data error!");
                     return LIGHT_COM_ERROR;
@@ -637,6 +641,7 @@ OPERATE_LIGHT app_light_ctrl_data_auto_read(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
             #else
                 opRet = ty_light_save_user_flash_read_data(eDataType,&tReadFavData);
             #endif
+            
                 if( LIGHT_OK != opRet ) {
                     TY_LOG_ERR("Read data error!");
                     return LIGHT_COM_ERROR;
@@ -677,18 +682,18 @@ OPERATE_LIGHT app_light_ctrl_data_auto_read(IN LIGHT_FLASH_SAVE_TYPE_E eDataType
             }
             break;
 		case TYPE_USER_DATA:
-            { 
-                LIGHT_CUST_DATA_FLASH_T tReadCustData;
-                memset(&tReadCustData, 0, sizeof(LIGHT_CUST_DATA_FLASH_T));
-            #if (LIGHT_CFG_3IN1_SAVE == 1) 
-                opRet = ty_light_save_user_flash_read_3in1_data(TYPE_USER_DATA,&tReadCustData);
-            #else
-                opRet = ty_light_save_user_flash_read_data(TYPE_USER_DATA,&tReadCustData);
-            #endif
-                //--------------------------------------------wwpc 20210129
-                lutec_read_saved_data_callback(opRet, tReadCustData);
-
-            }
+            // { 
+            //     LIGHT_CUST_DATA_FLASH_T tReadCustData;
+            //     memset(&tReadCustData, 0, sizeof(LIGHT_CUST_DATA_FLASH_T));
+            // #if (LIGHT_CFG_3IN1_SAVE == 1) 
+            //     opRet = ty_light_save_user_flash_read_3in1_data(TYPE_USER_DATA,&tReadCustData);
+            // #else
+            //     opRet = ty_light_save_user_flash_read_data(TYPE_USER_DATA, &tReadCustData);
+            // #endif
+            
+            //     //--------------------------------------------wwpc 20210129
+            //     lutec_read_saved_data_callback(opRet, tReadCustData);
+            // }
 		    break;
 		default:
 		    break;
@@ -708,11 +713,17 @@ static void app_light_ctrl_data_autosave_timer_callback(void)
     TY_LOG_DEBUG("auto save dp ctrl!");
 	opRet = app_light_ctrl_data_auto_save(TYPE_APP_DATA);
     opRet = app_light_ctrl_data_auto_save(TYPE_MEM_DATA);
+
+    //--------------------------------------------------------wwpc 20210330
+    lutec_save_data();
+    
+  
     if(opRet != LIGHT_OK) {
         TY_LOG_ERR("Light ctrl data auto save error!");
     }else{
         TY_LOG_DEBUG("Light ctrl app auto data save OK !");
     }
+
 
     opRet = ty_light_basis_sw_timer_stop(AUTOSAVE_SW_TIMER);
     if(opRet != LIGHT_OK) {
@@ -750,15 +761,19 @@ OPERATE_LIGHT app_ty_light_ctrldata_init(void)
     LIGHT_APP_DATA_FLASH_T tAPPData;
     LIGHT_MEM_USER_FLASH_T tMemData;
     OPERATE_LIGHT opRet = 1,opRet2 = 1;
+
     memset(&tAPPData, 0, sizeof(LIGHT_APP_DATA_FLASH_T));
+
 #if (LIGHT_CFG_3IN1_SAVE == 1)
     opRet = ty_light_save_user_flash_read_3in1_data(TYPE_APP_DATA,(u8*)&tAPPData);       /* read app flash data! */	
     opRet2 = ty_light_save_user_flash_read_3in1_data(TYPE_MEM_DATA,(u8*)&tMemData);
 #else
     ty_light_save_user_flash_offset_init();
 	opRet = ty_light_save_user_flash_read_data(TYPE_APP_DATA,&tAPPData);       /* read app flash data! */	
-    opRet2 = ty_light_save_user_flash_read_data(TYPE_MEM_DATA,&tMemData);
+    opRet2 = ty_light_save_user_flash_read_data(TYPE_MEM_DATA,&tMemData);  
 #endif
+
+
     if(opRet2 != LIGHT_OK)
     {
         tLightMemCfgData.usMemory = ty_light_json_config_get_pmemory_cfg();

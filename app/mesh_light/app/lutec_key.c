@@ -8,10 +8,13 @@
 
 
 #include "lutec_key.h"
+
 #include "gpio.h "
 
+#include "hal_gpio.h "
+
 #include "lutec_config.h"
-#include "lutec_tick.h"
+
 //#include "hal_uart.h"  //hal_uart_send(&duty_f, 1);
 //#include "lutec_led.h"
 
@@ -24,6 +27,7 @@ void lutec_key_init(void)
     gpio_set_func(GPIO_PD7, AS_GPIO);
     gpio_set_input_en(GPIO_PD7, 1);    
     gpio_set_output_en(GPIO_PD7, 0);
+    hal_gpio_setup_up_down_resistor(GPIO_PD7, GPIO_RESISTOR_PULLUP_1M);
 }
 
 
@@ -31,6 +35,10 @@ void lutec_key_loop(void)
 {
     static u8 key_state = 0;
     u8 pin_state = gpio_read(GPIO_PD7) >> 7;
+    
+#if USER_KEY_ACTIVE_LOW
+    pin_state = pin_state == 0 ? 1 : 0;//低电平有效
+#endif
     
     switch(key_state)
     {

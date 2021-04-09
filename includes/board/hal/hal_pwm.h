@@ -14,6 +14,8 @@
 #define HAL_GET_PWMID(gpio, func)           GET_PWMID(gpio, func)
 #define HAL_GET_PWM_INVERT_VAL(gpio, func)  GET_PWM_INVERT_VAL(gpio, func)
 
+
+
 void hal_pwm_set(pwm_id id, unsigned short cycle_tick, unsigned short cmp_tick);
 void hal_pwm_start(pwm_id id);
 void hal_pwm_start_sync(pwm_id id_1, pwm_id id_2);

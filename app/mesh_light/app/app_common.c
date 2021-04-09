@@ -89,7 +89,7 @@ static void app_light_vendor_group_addr_inquire(uint16_t src_addr, uint16_t dst_
 	dealy = get_primary_ele_addr()%100;
     inquire_src = src_addr;
     inquire_dst = dst_addr;
-    ty_timer_event_add(app_light_group_addr_inquire_callback,dealy*30*1000);//window 3s / 100device 30ms
+    ty_timer_event_add(app_light_group_addr_inquire_callback, dealy*30*1000);//window 3s / 100device 30ms
 }
 
 int mesh_app_close_config_network_callback()
@@ -218,7 +218,7 @@ void mesh_app_init(void){
         return;
     }
 
-    //---------------------wwpc 20210126
+    //---------------------wwpc 20210126  自定义初始化
     lutec_main_init();
 }
 
@@ -230,7 +230,7 @@ void mesh_app_init(void){
 void mesh_main_run(void){
     app_light_ctrl_loop();
 
-    //---------------------wwpc 20210126
+    //---------------------wwpc 20210126 自定义控制循环
     lutec_main_loop();
 }
 
@@ -251,8 +251,7 @@ void mesh_factory_reset(void){
 
 	ty_light_save_user_flash_offset_init();
 
-    app_light_ctrl_data_auto_save(TYPE_APP_DATA);
-	
+    app_light_ctrl_data_auto_save(TYPE_APP_DATA);	
 }
 
 
@@ -422,11 +421,12 @@ void app_tuya_vendor_set_light_data(uint16_t src_addr, uint16_t dst_addr, u8 *pa
     else{
         switch(par[0]){
             case 1:
-            {
+            {              
                 //--------------------------wwpc 20210129
                 //app_tuya_vendor_light_dp_data(par, par_len);
                 if((par[1] > 100) && (par[1] < 129))
                 {
+                    //hal_uart_send(par, par_len);
                     lutec_bluetooth_dp_data(src_addr, dst_addr, par, par_len);
                 }
                 else
@@ -491,6 +491,11 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
         return;
     }
     uart_reply_addr = src_addr;
+
+    //----------------测试
+    #if BT_DATA_DEBUG
+    hal_uart_send(data, data_len);
+    #endif
 
     APP_LOG_DUMP("recv data\r\n", data, data_len);
 
@@ -660,14 +665,22 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
 
             }
         break;
-        case TUYA_VD_TUYA_READ:{ 
+        case TUYA_VD_TUYA_READ:
+        {             
+            //-----------------------wwpc 20210311  app激活推送
+            lutec_updata_app_callback(src_addr);
+            
             if(0==data_len)
             {
                 u8 data = app_light_ctrl_data_mode_get_value();
                 tuya_mesh_data_send(dst_addr, src_addr, TUYA_VD_TUYA_DATA, &data, 1, 0, 1);
-            }else{
-                switch(data[0]){
-                    case 1:{
+            }
+            else
+            {
+                switch(data[0])
+                {
+                    case 1:
+                    {
                         for(u8 i=0;i<data[1];i++)
                         {
                             switch(data[i+2]){
@@ -718,7 +731,7 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
                                 default:
                                 break;
                             }
-                        }
+                        }            
                     }
                     break;
                     default:
@@ -733,7 +746,12 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
 #endif
 
     APP_LOG("ctrl data need to proc flag =%d", bActiveFlag);
-    if(bActiveFlag) {
+
+    //-----------------------------------------wwpc 20210326  
+    bActiveFlag = lutec_get_save_data_flag() > 0 ? TRUE : bActiveFlag;
+
+    if(bActiveFlag) 
+    {
         app_light_ctrl_data_auto_save_start(APP_DATA_AUTO_SAVE_DELAY_TIME);
         opRet = app_light_ctrl_proc();
         if(opRet != LIGHT_OK) {

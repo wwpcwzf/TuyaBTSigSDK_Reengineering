@@ -37,7 +37,7 @@ u8 AllScene[ALL_SCENE_MAX][SINGLE_SCENE_LEN];
     TYPE_FAV_SEC_DATA,
     TYPE_FAV_THD_DATA,
     TYPE_FAV_FUR_DATA,
-	TYPE_USER_DATA,
+	TYPE_USER_DATA
 }LIGHT_FLASH_SAVE_TYPE_E;
 
 //--------------LIGHT_CFG_3IN1_SAVE == 0
@@ -162,11 +162,9 @@ typedef struct
 /**
  * @brief Light custumer save structure
  */
-typedef struct {
-    //-------------------------wwpc 20210129
-    u8 lutec_wifi_name[64];
-    u8 lutec_wifi_passward[64];
-}LIGHT_CUST_DATA_FLASH_T;
+// typedef struct {
+// }LIGHT_CUST_DATA_FLASH_T;
+
 
 
 //@attention!!!
@@ -189,7 +187,7 @@ typedef struct {
 
 #define LIGHT_CUST_USER_OFFSET      0x7DC00
 
-#define FLASH_3IN1_DATA_SIZE_MAX  (sizeof(LIGHT_MEM_USER_FLASH_T) + sizeof(LIGHT_APP_DATA_FLASH_T) + sizeof(LIGHT_MDEV_TEST_DATA_FLASH_T) + (sizeof(LIGHT_FAVORITE_DATA_FLASH_T))*5 +9)
+#define FLASH_3IN1_DATA_SIZE_MAX  (sizeof(LIGHT_MEM_USER_FLASH_T) + sizeof(LIGHT_APP_DATA_FLASH_T) + sizeof(LIGHT_MDEV_TEST_DATA_FLASH_T) + (sizeof(LIGHT_FAVORITE_DATA_FLASH_T))*5 + 9)
 
 OPERATE_LIGHT ty_light_save_user_flash_open_appdata(void);
 

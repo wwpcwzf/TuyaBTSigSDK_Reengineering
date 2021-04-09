@@ -7,6 +7,7 @@
 ******************************************************************************************/
 
 #include "lutec_lux.h"
+#include "lutec_config.h"
 #include "adc.h"
 #include "hal_uart.h" //hal_uart_send(databuf, 4);
 
@@ -81,7 +82,7 @@ void lutec_lux_init(void)
 
 //-------------------------------------------------------------------------
 static u8 lux_flag = 0;
-static u8 lux_threshold = 870;//30% -- 30*29 = 870
+static u16 lux_threshold = LUX_THRESHOLD_DEF;//30% -- 30*29 = 870  
 
 /*-------------------------------------------------------------------------
 *简  介: 获取AD采样值--滤波--判断--修改标志
@@ -132,14 +133,14 @@ void lutec_lux_loop(void)
         {
             if(now_lux_ad > (lux_threshold + 5))//暗了
             {
-                lux_flag = 1;
+                lux_flag = 1;//使能
             }
         }
         else //已使能
         {
-            if(now_lux_ad < lux_threshold)
+            if(now_lux_ad < lux_threshold)//亮了
             {
-                lux_flag = 0;
+                lux_flag = 0;//失能
             }
         }
         //hal_uart_send(&now_lux_ad, 2);
@@ -180,7 +181,7 @@ void lutec_set_lux_threshold(u8 thsd_v)
 -------------------------------------------------------------------------*/
 u8 lutec_get_lux_threshold(void)
 {
-    return (100 - (u8)(lux_threshold / 29));
+    return (100 - (lux_threshold / 29));
 }
 
 

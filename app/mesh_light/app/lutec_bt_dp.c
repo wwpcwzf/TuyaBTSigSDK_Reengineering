@@ -12,7 +12,6 @@
 
 #include "lutec_main.h"
 #include "lutec_wifi.h"
-#include "lutec_tick.h"
 
 #include "lutec_pir.h"
 #include "lutec_lux.h"
@@ -29,9 +28,9 @@
 -------------------------------------------------------------------------*/
 void lutec_bluetooth_dp_data(u16 s_addr, u16 d_addr, u8 *par, int par_len)
 {
-#if 0
-    hal_uart_send(par, par_len);
-#endif
+// #if BT_DATA_DEBUG
+//     hal_uart_send(par, par_len);
+// #endif
     u8 len_buf = (u8)par_len;
     if(len_buf <= 7)//数据包长度不正确
     {
@@ -41,7 +40,8 @@ void lutec_bluetooth_dp_data(u16 s_addr, u16 d_addr, u8 *par, int par_len)
     //0x02远程上行---WiFi推送
     //0x03本地下行---解析+转发
     //0x04本地上行---不应收到此类数据帧
-    //0x06转发---解析    
+    //0x05转发---解析
+    //0x06联动---解析    
     if(par[4] == 0x04)//不应收到此类数据帧
     {
         return;
@@ -50,7 +50,7 @@ void lutec_bluetooth_dp_data(u16 s_addr, u16 d_addr, u8 *par, int par_len)
     if(((par[4] == 0x01) || (par[4] == 0x03)) && (d_addr >= 0xc000))
     {   
         lutec_ack_by_bt(par[4], par[1], s_addr);
-        par[4] = 0x06;//转发
+        par[4] = 0x05;//转发
         app_light_vendor_data_publish(d_addr, par, len_buf);
     }
 
@@ -58,15 +58,24 @@ void lutec_bluetooth_dp_data(u16 s_addr, u16 d_addr, u8 *par, int par_len)
     {
         lutec_updata_by_wifi(par, len_buf);
     }
-	else //解析0x01、0x03、0x06
+	else //解析0x01、0x03、0x05、0x06
     { 
         uint8_t ack_len = 0;
         ack_len = lutec_protocol_dp_analysis(&par[1]);//指令解析
         if(ack_len > 6)//回复 （dpID*1 数据类型*1 长度*1 指向*1 地址*2）== 6
         {
-            par[0] = 0x01;
+            par[0] = 0x01;            
+            par[5] = (u8)(lutec_get_address() >> 8);
+            par[6] = (u8)(lutec_get_address());
             app_light_vendor_data_publish(s_addr, par, ack_len + 1);
+
+        #if BT_DATA_DEBUG    
+            hal_uart_send(par, ack_len + 1);
+            //hal_uart_send(&d_addr, 2);
+        #endif
         }
+
+        //hal_uart_send(&s_addr, 2);
     }	
 }
 
@@ -89,10 +98,11 @@ u8 lutec_protocol_dp_analysis(u8 *par)
             if(par[2] == 4)
             {
                 lutec_light_switch(par[6]);
+                lutec_set_save_data_flag();
             }
             if(addr_buf < 0xC000)
             {
-                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;                
                 par[6] = lutec_get_switch_flag();
                 return_num = 7;
             }
@@ -101,6 +111,10 @@ u8 lutec_protocol_dp_analysis(u8 *par)
             if(par[2] >= 6)
             {
                 lutec_light_dimmer(&par[6]);
+                if(par[3] != 0x06)//非联动
+                {   
+                    lutec_set_save_data_flag();
+                }
             }
             if(addr_buf < 0xC000)
             {
@@ -110,6 +124,10 @@ u8 lutec_protocol_dp_analysis(u8 *par)
             }    
             break;
         case 0x6A://延时调光
+            if((lutec_get_switch_flag() != 2) && (par[3] == 0x06))//常亮or长灭时，不执行PIR联动指令
+            {
+                break;
+            }
             if(par[2] >= 7)
             {
                 lutec_light_delay_dimmer(&par[6]);
@@ -121,15 +139,11 @@ u8 lutec_protocol_dp_analysis(u8 *par)
                 par[2] = return_num - 3;
             }           
             break;
-        case 0x6B://wifi配网            
-            if((par[6] < 33) && (par[6] > 0) && (par[2] > 11))//33 > ssid长度(1~32) > 0,密码 > 8; 8+3=11
+        case 0x6B://wifi配网  
+            //hal_uart_send(par, par[2] + 3);          
+            if((par[7] < 33) && (par[7] > 0) && (par[6] < 97) && (par[6] > 8))//ssid长度(1~32); 密码(8~64);
             {
                 lutec_light_config_wifi(&par[6], par[2] - 3);
-                lutec_set_wifi_config_flag(2);
-            }
-            else
-            {
-                lutec_set_wifi_config_flag(1);
             }
             if(addr_buf < 0xC000)
             {
@@ -137,6 +151,7 @@ u8 lutec_protocol_dp_analysis(u8 *par)
                 return_num = lutec_get_wifi_para(&par[6]) + 6;
                 par[2] = return_num - 3;
             }  
+            //hal_uart_send(par, par[2] + 3); 
             break;
         case 0x6C://重启control
             if(par[2] == 4)
@@ -153,7 +168,7 @@ u8 lutec_protocol_dp_analysis(u8 *par)
         case 0x6D://感应器配置         
             if(par[2] == 6)
             {
-                lutec_pir_config(&par[6]);
+                lutec_pir_config(&par[6]);    
             }
             if(addr_buf < 0xC000)
             {
@@ -165,7 +180,7 @@ u8 lutec_protocol_dp_analysis(u8 *par)
         case 0x6E://感应灯控设置            
             if(par[2] == 32) //
             {
-                lutec_pir_light_control_set(&par[6]);
+                lutec_pir_light_control_set(&par[6]);   
             }
             else
             {
@@ -184,7 +199,8 @@ u8 lutec_protocol_dp_analysis(u8 *par)
         case 0x6F://感应查询、上报及设置
             if(par[2] == 4)
             {
-                lutec_pir_updata_set(par[6]);
+                lutec_pir_updata_set(par[6]);  
+                lutec_set_save_data_flag(); 
             }
             if(addr_buf < 0xC000)
             {
@@ -229,7 +245,7 @@ u8 lutec_protocol_dp_analysis(u8 *par)
         case 0x73://环境照度 
             if(par[2] == 5)
             {
-                lutec_env_illum_set(&par[6]);
+                lutec_env_illum_set(&par[6]); 
             }
             if(addr_buf < 0xC000)
             {
@@ -285,12 +301,10 @@ u8 lutec_protocol_dp_analysis(u8 *par)
         case 0x78://设备状态                      
             if(addr_buf < 0xC000)
             {
-                par[0]  = 0x7C;//ACK回复
-                par[2]  = 5;
+                par[2] = 4;
                 par[3]  = par[3] == 0x01 ? 0x02 : 0x04;
-                par[6]  = 0x78;// 
-                par[7]  = 0x03;//未实现
-                return_num = 8; 
+                par[6]  = lutec_get_device_state();
+                return_num = 7; 
             }
             break;
         case 0x79://报警                       
@@ -304,16 +318,18 @@ u8 lutec_protocol_dp_analysis(u8 *par)
                 return_num = 8; 
             }
             break;
-        case 0x7A://产测                      
+        case 0x7A://产测  dpID | 数据类型 | 指令长度 | 指向 | 地址 | 指令参数
+             if(par[2] == 4)
+            {
+                lutec_production_test_on(par[6]);
+            }
             if(addr_buf < 0xC000)
             {
-                par[0]  = 0x7C;//ACK回复
-                par[2]  = 5;
-                par[3]  = par[3] == 0x01 ? 0x02 : 0x04;
-                par[6]  = 0x7A;// 
-                par[7]  = 0x03;//未实现A
-                return_num = 8; 
-            }
+                par[2] = 4;
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                par[6] = lutec_get_production_test_state();
+                return_num = 7;
+            }  
             break;
         case 0x7B://更新固件                      
             if(addr_buf < 0xC000)
@@ -328,9 +344,8 @@ u8 lutec_protocol_dp_analysis(u8 *par)
             break;
         //case 0x7C://应答
         //break;
-        case 0x7D://注册指令（设置地址，分组） 
-            hal_uart_send(par, par[2] + 3); 
-            if(par[2] == 5)
+        case 0x7D://注册指令（设置地址，分组）             
+            if(par[2] >= 6)
             {
                 lutec_device_addr_control(&par[6], addr_buf, par[2] - 3);
             }
@@ -339,17 +354,36 @@ u8 lutec_protocol_dp_analysis(u8 *par)
                 par[3] = par[3] == 0x01 ? 0x02 : 0x04;
                 return_num = lutec_get_ack_addr(&par[6]) + 6;
                 par[2] = return_num - 3;
-            }                 
-            hal_uart_send(par, par[2] + 3);
+            }              
             break;
         case 0x7E://设备识别号
-            //sys_execution_0x7E();
+            if(addr_buf < 0xC000)
+            {
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                return_num = lutec_get_device_id(&par[6]) + 6;
+                par[2] = return_num - 3;
+            }        
             break;
         case 0x7F://wifi状态
-            //sys_execution_0x7F();
+            //hal_uart_send(par, par[2] + 3);
+            if(addr_buf < 0xC000)
+            {
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                par[6] = lutec_get_wifi_state();
+                return_num = 7;
+                par[2] = return_num - 3;
+            }                 
+            //hal_uart_send(par, par[2] + 3);
             break;
         case 0x80: //wifi模块信息
-            //sys_execution_0x80();
+            //hal_uart_send(par, par[2] + 3); 
+            if(addr_buf < 0xC000)
+            {
+                par[3] = par[3] == 0x01 ? 0x02 : 0x04;
+                return_num = lutec_get_wifi_id(&par[6]) + 6;
+                par[2] = return_num - 3;
+            }                 
+            //hal_uart_send(par, par[2] + 3);
             break;
         default:
         break;
@@ -376,16 +410,46 @@ void lutec_ack_by_bt(uint8_t point_to, uint8_t ack_id, uint16_t sent_to_addr)
     data_buffer[2]  = 0x00;
     data_buffer[3]  = 0x05;
     data_buffer[4]  = point_to + 1; 
-    u16 addrbuf = lutec_get_address();
-    data_buffer[5] = (addrbuf >> 8) & 0xFF;
-    data_buffer[6] = (addrbuf >> 0) & 0xFF;
+    //u16 addrbuf = lutec_get_address();
+    data_buffer[5] = (u8)(lutec_get_address() >> 8);
+    data_buffer[6] = (u8)(lutec_get_address());
     data_buffer[7]  = ack_id;
     data_buffer[8]  = 0x06;
 
     app_light_vendor_data_publish(sent_to_addr, data_buffer, 9);
 }
 
-static u8 switch_flag = 0;
+/*-------------------------------------------------------------------------
+*简  介:
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_updata_by_bt(u8 point_to, u8 dp_id, u8* data_ptr, u8 data_len, u16 sent_to_addr)
+{  
+    if(sent_to_addr == 0x0000)
+    {
+        return;
+    }
+    uint8_t data_buffer[255] = {0};
+
+    data_buffer[0]  = 0x01;
+    data_buffer[1]  = dp_id;
+    data_buffer[2]  = 0x00;
+    data_buffer[3]  = data_len + 3;
+    data_buffer[4]  = point_to; 
+    u16 addrbuf = lutec_get_address();
+    data_buffer[5] = (addrbuf >> 8) & 0xFF;
+    data_buffer[6] = (addrbuf >> 0) & 0xFF;
+    for(addrbuf = 0; addrbuf < data_len; addrbuf++)
+    {
+        data_buffer[7 + addrbuf] = data_ptr[addrbuf];
+    }
+    //hal_uart_send(data_buffer, 7 + data_len);
+    app_light_vendor_data_publish(sent_to_addr, data_buffer, 7 + data_len);
+    //hal_uart_send(&sent_to_addr, 2);
+}
+
+static u8 switch_flag = SWITCH_ONOFF_DEF;
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: 
@@ -402,6 +466,7 @@ void lutec_light_switch(u8 switch_v)
         break;
     case 1:
         app_light_ctrl_data_switch_set(1);
+        app_light_ctrl_data_bright_set(0x03E8);
         app_light_ctrl_data_countdown_set(0);
         switch_flag = 1;
         break;
@@ -411,11 +476,12 @@ void lutec_light_switch(u8 switch_v)
         //break;
     default:
         app_light_ctrl_data_switch_set(1);
-        app_light_ctrl_data_countdown_set(3);
+        app_light_ctrl_data_bright_set(0x03E8);
+        //app_light_ctrl_data_countdown_set(3);
         switch_flag = 2;
+        lutec_set_pir_someone();
         break;
     }
-    //app_light_ctrl_data_auto_save_start(5000);
     app_light_ctrl_proc();
 }
 /*-------------------------------------------------------------------------
@@ -426,6 +492,15 @@ void lutec_light_switch(u8 switch_v)
 u8 lutec_get_switch_flag(void)
 {
     return switch_flag;
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_set_switch_flag(u8 flag_value)
+{
+    switch_flag = flag_value;
 }
 
 /*-------------------------------------------------------------------------
@@ -441,52 +516,58 @@ void lutec_light_dimmer(u8* para_ptr)
     {
     case 0x11://色温调光
         buffer16_v = ((u16)para_ptr[1] << 8) + para_ptr[2];
-        if(buffer16_v == 0)
-        {
-            app_light_ctrl_data_switch_set(0);
-            app_light_ctrl_data_countdown_set(0);
-        }
-        else
-        {
+        // if(buffer16_v == 0)
+        // {
+        //     app_light_ctrl_data_switch_set(0);
+        //     app_light_ctrl_data_countdown_set(0);
+        // }
+        // else
+        // {
             if(buffer16_v > 1000)  buffer16_v = 1000;
-            app_light_ctrl_data_switch_set(1);
-            app_light_ctrl_data_countdown_set(0);
+            //app_light_ctrl_data_switch_set(1);
+            //app_light_ctrl_data_countdown_set(0);
             app_light_ctrl_data_temperature_set(buffer16_v);
-        }
+        // }
         break;
     case 0x12://亮度调光    
         buffer16_v = ((u16)para_ptr[1] << 8) + para_ptr[2];
-        if(buffer16_v == 0)
-        {
-            app_light_ctrl_data_switch_set(0);
-            app_light_ctrl_data_countdown_set(0);
-        }
-        else
-        {
+        // if(buffer16_v == 0)
+        // {
+        //     app_light_ctrl_data_switch_set(0);
+        //     app_light_ctrl_data_countdown_set(0);
+        // }
+        // else
+        // {
             if(buffer16_v > 1000)  buffer16_v = 1000;
             app_light_ctrl_data_switch_set(1);
             app_light_ctrl_data_countdown_set(0);
             app_light_ctrl_data_bright_set(buffer16_v);
-        }    
+        // }    
         break;
     case 0x13://亮度色温调光
         //app_light_ctrl_data_mode_set(WHITE_MODE);
         buffer16_v = ((u16)para_ptr[1] << 8) + para_ptr[2];
-        if(buffer16_v == 0)
-        {
-            app_light_ctrl_data_switch_set(0);
-            app_light_ctrl_data_countdown_set(0);
-        }
-        else
-        {
-            if(buffer16_v > 1000)  buffer16_v = 1000;
+        // if(buffer16_v == 0)
+        // {
+        //     app_light_ctrl_data_switch_set(0);
+        //     app_light_ctrl_data_countdown_set(0);
+        // }
+        // else
+        // {
+            if(buffer16_v > 1000) 
+            {
+                buffer16_v = 1000;
+            }
             app_light_ctrl_data_switch_set(1);
             app_light_ctrl_data_countdown_set(0);
             app_light_ctrl_data_bright_set(buffer16_v);
             buffer16_v = ((u16)para_ptr[3] << 8) + para_ptr[4];
-            if(buffer16_v > 1000) buffer16_v = 1000;
+            if(buffer16_v > 1000) 
+            {
+                buffer16_v = 1000;
+            }
             app_light_ctrl_data_temperature_set(buffer16_v);
-        }        
+        // }        
         break;
     case 0x1A://HSV调光
         break;
@@ -587,7 +668,7 @@ void lutec_delay_dim_loop(void)
 -------------------------------------------------------------------------*/
 u8 lutec_get_dim_para_len(u8 dim_flag)
 {
-    hal_uart_send(&dim_flag, 1);
+    //hal_uart_send(&dim_flag, 1);
     switch(dim_flag)
     {
         case 0x11:
@@ -611,9 +692,10 @@ u8 lutec_get_dim_para_len(u8 dim_flag)
         case 0x1C:
         case 0x1D:
         case 0x4C:
-        case 0x4D:
-        default:
+        case 0x4D:        
             return 1;
+        default:
+            return 0;
     }
 }
 
@@ -635,10 +717,17 @@ void lutec_light_delay_dimmer(u8* para_p)
     if(para_p[3] > 0x40)//先等待再调光
     {
         u8 para_l = lutec_get_dim_para_len(para_p[3]);
-        for(u8 i = 0; i < para_l; i++)
+        if(para_l > 0)
         {
-            delay_target_para[i] = para_p[3 + i];
+            for(u8 i = 0; i < para_l; i++)
+            {
+                delay_target_para[i] = para_p[3 + i];
+            }
         }
+        else  //参数不正确---未处理
+        {
+
+        }        
     }
     else //先调光在等待关灯
     {
@@ -647,15 +736,15 @@ void lutec_light_delay_dimmer(u8* para_p)
     }
 
     //延时时基
-    if((para_p[3] == 0x4C) || (para_p[3] == 0x4D))
-    {
-        app_light_ctrl_data_countdown_set(delay_time);
-        delay_time_base = 0;
-    } 
-    else
-    {
+    // if((para_p[3] == 0x4C) || (para_p[3] == 0x4D))
+    // {
+    //     app_light_ctrl_data_countdown_set(delay_time);
+    //     delay_time_base = 0;
+    // } 
+    // else
+    //
         delay_time_base = lutec_get_tick_10ms();
-    }   
+    //}   
 }
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -669,7 +758,7 @@ u8 lutec_get_delay_dimming_para(u8* get_p)
     return lutec_get_dim_para_len(get_p[3]);
 }
 
-static u8 wifi_ssid_psw[99] = {0}; //总长度[1]|ssid长度[1]|ssid[1~32]|password[8~64]|和校验[1]
+static u8 wifi_ssid_psw[132] = {0}; //总长度[1]|ssid+密码长度[1]|ssid长度[1]|ssid[1~32]|password[8~64]|token[1~32]和校验[1]
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: 
@@ -677,24 +766,20 @@ static u8 wifi_ssid_psw[99] = {0}; //总长度[1]|ssid长度[1]|ssid[1~32]|passw
 -------------------------------------------------------------------------*/
 void lutec_light_config_wifi(u8* para_p, u8 para_l)
 {
-    if((para_p[0] == wifi_ssid_psw[1]) && (para_l == wifi_ssid_psw[0]))//长度相同
-    {
-        if(lutec_string_compare(&para_p[1], &wifi_ssid_psw[2], para_l))//信息相同
+    //hal_uart_send(para_p, para_l);
+    if((para_l > (para_p[0] + 2)) && (para_l < 129))//长度
+    {        
+        // 更新wifi信息
+        wifi_ssid_psw[0] = para_l;//总长
+        for(u8 sub_i = 0; sub_i < para_l; sub_i++)//ssid+密码长度[1]|ssid长度[1]|ssid[1~32]|password[8~64]|token[1~32]
         {
-            return;
+            wifi_ssid_psw[sub_i + 1] = para_p[sub_i];
         }
+        wifi_ssid_psw[para_l + 1] = lutec_check_sum(wifi_ssid_psw, wifi_ssid_psw[0] + 1);//
+
+        lutec_start_wifi_connect();
+        //hal_uart_send(wifi_ssid_psw, wifi_ssid_psw[0] + 2);
     }
-    if(para_l < (para_p[0] + 8))//密码长度大于8
-    {
-        return;
-    }
-    // 更新wifi信息
-    for(u8 sub_i = 0; sub_i < para_l; sub_i++)
-    {
-        wifi_ssid_psw[1 + sub_i] = para_p[sub_i];
-    }
-    wifi_ssid_psw[0] = para_l;//总长
-    wifi_ssid_psw[para_l + 1] = lutec_check_sum(wifi_ssid_psw, wifi_ssid_psw[0]);
 }
 
 
@@ -705,8 +790,9 @@ void lutec_light_config_wifi(u8* para_p, u8 para_l)
 -------------------------------------------------------------------------*/
 u8 lutec_get_wifi_para(u8* para_g)
 {
-    if((wifi_ssid_psw[0] < (wifi_ssid_psw[1] + 8)) || (wifi_ssid_psw[wifi_ssid_psw[0] + 1] != lutec_check_sum(wifi_ssid_psw, wifi_ssid_psw[0])))
+    if((wifi_ssid_psw[1] < (wifi_ssid_psw[2] + 8)) || (wifi_ssid_psw[wifi_ssid_psw[0] + 1] != lutec_check_sum(wifi_ssid_psw, wifi_ssid_psw[0] + 1)))
     {
+        //hal_uart_send(wifi_ssid_psw, wifi_ssid_psw[0] + 2);
         para_g[0] = 0xFE;//暂无数据
         return 1;
     }
@@ -715,7 +801,7 @@ u8 lutec_get_wifi_para(u8* para_g)
     {
         para_g[sub_i] = wifi_ssid_psw[1 + sub_i];
     }
-
+    //hal_uart_send(wifi_ssid_psw, wifi_ssid_psw[0] + 2);
     return wifi_ssid_psw[0];
 }
 /*
@@ -723,15 +809,8 @@ u8 lutec_get_wifi_para(u8* para_g)
 0xF2: 恢复出厂设置
 0xF3: 蓝牙重置
 0xF4: 摄像模块重置
-//--------------------------
-0xF7: MCU重启完成
-0xF8: 恢复出厂设置成功
-0xF9: 蓝牙重置中
-0xFA: 蓝牙重置成功
-0xFB: 摄像模块重置中
-0xFC: 摄像模块重置成功
 */
-static u8 reset_state = 0;//
+static u8 reset_cmd = 0;//
 static u32 reset_time_base = 0;
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -742,21 +821,28 @@ void lutec_light_reset_control(u8 rset_cm)
 {
     switch(rset_cm)
     {
-        case 0xF1://MCU重启 细节未处理？
-        //break;
-        case 0xF2://恢复出厂设置
-        // kick_out();//蓝牙重置reg_pwdn_ctrl |= FLD_PWDN_CTRL_REBOOT;  
-        // lutec_reset_wifi_module();//重置WiFi模块
-        // break;
-        case 0xF3://蓝牙重置
+    case 0xF1://MCU重启 细节未处理？
+        reset_time_base = lutec_get_tick_10ms();//reg_pwdn_ctrl |= FLD_PWDN_CTRL_REBOOT;
+        reset_cmd = 0xF1;
+        break;
+    case 0xF2://恢复出厂设置
+        lutec_device_reset();
+        reset_cmd = 0xF2;
+        if(lutec_get_device_state() > 0x53)
+        {
+            lutec_set_device_state(0x53);//出场状态
+        }
+        break;
+    case 0xF3://蓝牙重置
         //kick_out();//蓝牙重置reg_pwdn_ctrl |= FLD_PWDN_CTRL_REBOOT;  
-        reset_time_base = lutec_get_tick_10ms;
-        reset_state = 0xF2;
+        reset_time_base = lutec_get_tick_10ms();
+        reset_cmd = 0xF3;
         break;
-        case 0xF4://重置WiFi模块
+    case 0xF4://重置WiFi模块
         lutec_reset_wifi_module();
+        reset_cmd = 0xF4;
         break;
-        default:
+    default:
         break;
     }
 }
@@ -765,16 +851,31 @@ void lutec_light_reset_control(u8 rset_cm)
 *参  数: 
 *返回值: 
 -------------------------------------------------------------------------*/
-void lutec_device_reset(void)
+void lutec_bt_module_reset_control(void)
 {
     if(reset_time_base == 0)
     {
         return;
     }
-    if(lutec_get_interval_tick_10ms(reset_time_base) > 300)
+    if(lutec_get_interval_tick_10ms(reset_time_base) > 200)
     { 
-        reset_time_base = 0;
-        kick_out();//蓝牙重置reg_pwdn_ctrl |= FLD_PWDN_CTRL_REBOOT; 
+        switch(reset_cmd)
+        {
+        case 0xF1:
+            reset_cmd = 0;
+            reset_time_base = 0;
+            reg_pwdn_ctrl |= FLD_PWDN_CTRL_REBOOT; 
+            break;
+        case 0xF3:
+            reset_cmd = 0;
+            reset_time_base = 0;
+            kick_out();
+            break;
+        default:
+            reset_cmd = 0;
+            reset_time_base = 0;
+            break;
+        }
     }
 }
  /*-------------------------------------------------------------------------
@@ -784,20 +885,11 @@ void lutec_device_reset(void)
 -------------------------------------------------------------------------*/ 
  u8 lutec_get_reset_state(u8* sv_ptr)
  {
-     sv_ptr[0] = reset_state;
+     sv_ptr[0] = reset_cmd;
      return 1;
  }
  
  
-/*-------------------------------------------------------------------------
-*简  介: 
-*参  数: 
-*返回值: 
--------------------------------------------------------------------------*/
-void lutec_set_reset_state(u8 rset_s)
-{
-
-}
 
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -812,6 +904,7 @@ void lutec_pir_config(u8* para_p)
         return;
     }
     lutec_pir_set_sensitivity((u8)buf16);
+    lutec_set_save_data_flag();
 }
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -826,10 +919,279 @@ u8 lutec_get_pir_para(u8* g_ptr)
     return 3;
 }
 
-static u32 pir_noone_delay = 0;
-static u8 noone_pir_light_par[11] = {0x1C,0,0,0,0,0,0,0,0,0,0};
-static u32 pir_anyone_delay = 10000;
-static u8 anyone_pir_light_par[11] = {0x1D,0,0,0,0,0,0,0,0,0,0};
+
+//----------------------------若修改在lutec_eeprom.c的lutec_eeprom_save_data_init()中同步修改
+static u32 pir_noone_delay = NO_ONE_LIGHT_ON_TIME;
+static u8 noone_pir_light_par[11] = {0x13,0x00,0x32,0x01,0xF4,0,0,0,0,0,0};
+static u32 pir_anyone_delay = SOMEONE_LIGHT_ON_TIME;//
+static u8 anyone_pir_light_par[11] = {0x13,0x03,0xE8,0x03,0xE8,0,0,0,0,0,0};
+
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_get_pir_dim_para(u32* noone_t, u8* noone_p, u32* someone_t, u8* someone_p)
+{
+    *noone_t = pir_noone_delay;
+    *someone_t = pir_anyone_delay;
+    for(u8 p_sub = 0; p_sub < 11; p_sub++)
+    {
+        noone_p[p_sub] = noone_pir_light_par[p_sub];
+        someone_p[p_sub] = anyone_pir_light_par[p_sub];
+    }
+}
+
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_set_pir_dim_para(u32 noone_t, u8* noone_p, u32 someone_t, u8* someone_p)
+{
+    pir_noone_delay = noone_t;
+    pir_anyone_delay = someone_t; 
+    for(u8 p_sub = 0; p_sub < 11; p_sub++)
+    {
+        noone_pir_light_par[p_sub] = noone_p[p_sub];
+        anyone_pir_light_par[p_sub] = someone_p[p_sub];
+    }
+}
+
+
+
+/*-------------------------------------------------------------------------
+*简  介: 获取亮灯时间
+*参  数: u8 any_one（0-无人；1-有人）
+*返回值: 单位10ms
+-------------------------------------------------------------------------*/
+u32 lutec_get_pir_delay_time(u8 any_one)
+{
+    if(any_one == 0)
+    {
+        //return pir_noone_delay < 10 ? 0 : (u32)(pir_noone_delay / 10);
+        if(pir_noone_delay == 0)
+        {
+            return 0;
+        }
+        else
+        {
+            return (pir_noone_delay * 100) - 50;
+        }
+    }
+    else
+    {
+        //return pir_anyone_delay < 10 ? 0 : (u32)(pir_anyone_delay / 10);
+        if(pir_anyone_delay == 0)
+        {
+            return 0;
+        }
+        else
+        {
+            return (pir_anyone_delay * 100) - 50;
+        }
+    }    
+}
+
+/*-------------------------------------------------------------------------
+*简  介: 感应灯控
+*参  数: u8 any_one（0-结束；1-无人；2-有人）
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_pir_dimmer(u8 any_one)
+{
+    // hal_uart_send(&any_one, 1);//--------测试
+    // hal_uart_send(&pir_noone_delay, 4);
+    // hal_uart_send(noone_pir_light_par, 11);
+    // hal_uart_send(&pir_anyone_delay, 4);
+    // hal_uart_send(anyone_pir_light_par, 11);
+
+    switch(any_one)
+    {
+    case 0x00:{
+        u8 cmdbuf = 0x1C;
+        lutec_light_dimmer(&cmdbuf);
+        }
+        break;
+    case 0x01:  
+        lutec_light_dimmer(noone_pir_light_par);  
+        break;
+    case 0x02:    
+        lutec_light_dimmer(anyone_pir_light_par);  
+        break;
+    default:
+        return;
+    }
+}
+
+/*-------------------------------------------------------------------------
+*简  介: 组播感应灯控
+*参  数: u8 any_one（0-结束；1-无人；2-有人），组播地址
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_pir_multicast(u8 any_one, u16 addr_v)
+{
+	u8 buffer_data[28]= {0};
+    u8 mult_data_len = 0;
+
+    buffer_data[0]  = 0x01;
+    buffer_data[1]  = 0x6A;
+    buffer_data[2]  = 0x00;
+    //buffer_data[3]  = ;//长度
+    buffer_data[4]  = 0x06;//联动
+    buffer_data[5] = (u8)(addr_v >> 8);//目标地址
+    buffer_data[6] = (u8)(addr_v);
+    switch(any_one)
+    {
+    case 0x00:
+        buffer_data[7] = 0x00;//时间
+        buffer_data[8] = 0x00;
+        buffer_data[9] = 0x00;
+        buffer_data[10] = 0x1C;//灯控参数--关灯
+        mult_data_len = 11;
+        break;
+    case 0x01:        
+        buffer_data[7] = (u8)(pir_noone_delay >> 16);//时间
+        buffer_data[8] = (u8)(pir_noone_delay >> 8);
+        buffer_data[9] = (u8)(pir_noone_delay >> 0);
+        mult_data_len = lutec_get_dim_para_len(noone_pir_light_par[0]);
+        if(mult_data_len == 0)
+        {            
+            buffer_data[10] = 0x1C;//灯控参数--关灯
+            mult_data_len = 11;
+        }
+        else
+        {
+            for(u8 sub_ii = 0; sub_ii < mult_data_len; sub_ii++)
+            {
+                buffer_data[10 + sub_ii] = noone_pir_light_par[sub_ii];
+            }
+            mult_data_len += 10;
+        }
+        break;
+    case 0x02:
+        if(pir_anyone_delay == 0)
+        {
+            pir_anyone_delay = 10000;
+        }
+        buffer_data[7] = (u8)(pir_anyone_delay >> 16);//时间
+        buffer_data[8] = (u8)(pir_anyone_delay >> 8);
+        buffer_data[9] = (u8)(pir_anyone_delay >> 0);
+        mult_data_len = lutec_get_dim_para_len(anyone_pir_light_par[0]);
+        if(mult_data_len == 0)
+        {            
+            buffer_data[10] = 0x1D;//灯控参数--关灯
+            mult_data_len = 11;
+        }
+        else
+        {
+            for(u8 sub_ii = 0; sub_ii < mult_data_len; sub_ii++)
+            {
+                buffer_data[10 + sub_ii] = anyone_pir_light_par[sub_ii];
+            }
+            mult_data_len += 10;
+        }
+        break;
+    default:
+        return;
+    }
+    buffer_data[3]  = mult_data_len - 4;//长度
+
+    app_light_vendor_data_publish(addr_v, buffer_data, mult_data_len);
+}
+/*-------------------------------------------------------------------------
+*简  介: 组播感应灯控
+*参  数: u8 any_one（0-结束；1-无人；2-有人），组播地址
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_pir_sig_cmd_multicast(u8 any_one, u16 addr_v)
+{
+    u16 buffer16_v = 0;
+    switch(any_one)
+    {
+    case 0x00:
+        lutec_send_onoff_sig_cmd(addr_v, 0x00);//关灯
+        break;
+    case 0x01:  
+        if(pir_noone_delay == 0)
+        {
+            lutec_send_onoff_sig_cmd(addr_v, 0x00);//关灯
+            break;
+        }
+        switch(noone_pir_light_par[0])
+        {
+        case 0x11://色温
+            buffer16_v = ((u16)noone_pir_light_par[1] << 8) + noone_pir_light_par[2];
+            lutec_send_temperature_sig_cmd(addr_v, buffer16_v);
+            break;
+        case 0x12://亮度        
+            buffer16_v = ((u16)noone_pir_light_par[1] << 8) + noone_pir_light_par[2];
+            lutec_send_bright_sig_cmd(addr_v, buffer16_v);
+            break;
+        case 0x13://亮度色温        
+            buffer16_v = ((u16)noone_pir_light_par[1] << 8) + noone_pir_light_par[2];  
+            lutec_send_bright_sig_cmd(addr_v, buffer16_v);
+            buffer16_v = ((u16)noone_pir_light_par[3] << 8) + noone_pir_light_par[4];
+            lutec_send_temperature_sig_cmd(addr_v, buffer16_v);
+            break;
+        case 0x1A://HSV
+            break;
+        case 0x1B://RGB
+            break;
+        case 0x2A://亮度色温+HSV
+            break;
+        case 0x2B://亮度色温+RGB
+            break;
+        default:
+            lutec_send_onoff_sig_cmd(addr_v, 0x00);//关灯
+            break;
+        }
+        break;
+    case 0x02:
+        if(pir_anyone_delay == 0)
+        {
+            pir_anyone_delay = SOMEONE_LIGHT_ON_TIME;
+            lutec_send_onoff_sig_cmd(addr_v, 0x01);//开灯       
+            buffer16_v = 0x03E8;
+            lutec_send_bright_sig_cmd(addr_v, buffer16_v);
+            //lutec_send_temperature_sig_cmd(addr_v, buffer16_v);
+            break;
+        }
+        switch(anyone_pir_light_par[0])
+        {
+        case 0x11://色温
+            buffer16_v = ((u16)anyone_pir_light_par[1] << 8) + anyone_pir_light_par[2];
+            lutec_send_temperature_sig_cmd(addr_v, buffer16_v);
+            break;
+        case 0x12://亮度
+            buffer16_v = ((u16)anyone_pir_light_par[1] << 8) + anyone_pir_light_par[2];
+            lutec_send_bright_sig_cmd(addr_v, buffer16_v);
+            break;
+        case 0x13://亮度色温               
+            lutec_send_onoff_sig_cmd(addr_v, 0x01);//开灯       
+            buffer16_v = ((u16)anyone_pir_light_par[1] << 8) + anyone_pir_light_par[2];
+            lutec_send_bright_sig_cmd(addr_v, buffer16_v);
+            buffer16_v = ((u16)anyone_pir_light_par[3] << 8) + anyone_pir_light_par[4];
+            lutec_send_temperature_sig_cmd(addr_v, buffer16_v);
+            break;
+        case 0x1A://HSV
+            break;
+        case 0x1B://RGB
+            break;
+        case 0x2A://亮度色温+HSV
+            break;
+        case 0x2B://亮度色温+RGB
+            break;
+        default:
+            lutec_send_onoff_sig_cmd(addr_v, 0x00);//关灯
+            break;
+        }
+        break;
+    default:
+        return;
+    }
+}
+
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: 
@@ -855,6 +1217,10 @@ void lutec_pir_light_control_set(u8* para_p)
     buffer32_v = ((u16)para_p[4] << 8) + para_p[5];
     if((buffer32_v <= 1000) && ((para_p[0] & 0x40) == 0x40))//pir无人亮度
     {
+        if(buffer32_v == 0)
+        {
+            pir_noone_delay = 0; 
+        }
         noone_pir_light_par[1] = para_p[4];
         noone_pir_light_par[2] = para_p[5];
         buf8_v |= 0x12;
@@ -920,6 +1286,12 @@ void lutec_pir_light_control_set(u8* para_p)
     {
         pir_anyone_delay = 0; 
     }
+    
+    //hal_uart_send(&para_p[0], 1);
+
+    //hal_uart_send(&pir_anyone_delay, 4);
+
+
     buf8_v = 0;
     sub8_i = 1;
     buffer32_v = ((u16)para_p[4] << 8) + para_p[5];
@@ -979,6 +1351,7 @@ void lutec_pir_light_control_set(u8* para_p)
         anyone_pir_light_par[10] = 0;
     }
     anyone_pir_light_par[0] = buf8_v == 0 ? 0x1C : buf8_v;//调光标记
+    lutec_set_save_data_flag();
 }
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -990,7 +1363,7 @@ u8 lutec_get_pir_light_control_para(u8* s_ptr)
     u8 falg_v = 0;
     u8 sub_i = 0;
     //无人参数    
-	if(pir_noone_delay != 0)
+	if(pir_noone_delay > 0)
 	{
 		falg_v |= 0x80;
 		s_ptr[1] = (uint8_t)(pir_noone_delay >> 16);
@@ -1094,7 +1467,7 @@ u8 lutec_get_pir_light_control_para(u8* s_ptr)
 			break;	
 	}
     //有人参数
-    if(pir_anyone_delay != 0)
+    if(pir_anyone_delay > 0)
 	{
 		falg_v |= 0x08;
 		s_ptr[15] = (u8)(pir_anyone_delay >> 16);
@@ -1198,7 +1571,7 @@ u8 lutec_get_pir_light_control_para(u8* s_ptr)
 			break;	
 	}
 
-	s_ptr[0] = falg_v;
+	s_ptr[0] = falg_v == 0x08 ? 0x00 : falg_v;
     
     return 29;
 
@@ -1206,7 +1579,7 @@ u8 lutec_get_pir_light_control_para(u8* s_ptr)
 
 
 
-static u8 pir_updata_falg  = 0xF2;//0xF1:上报APP；0xF2：不上报；
+static u8 pir_updata_falg  = PIR_UPDATA_APP_DEF;//0xF1:上报APP；0xF2：不上报；
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: 
@@ -1253,6 +1626,7 @@ void lutec_env_illum_set(u8* para_p)
     if(buf_va <= 100)
     {
         lutec_set_lux_threshold((u8)buf_va);
+        lutec_set_save_data_flag();
     }
 }
 
@@ -1296,11 +1670,11 @@ void lutec_device_addr_control(u8* para_p, u16 s_addr, u8 para_l)
                 u8 group_num = (para_l - 1) / 2;
                 for(u8 sub_n = 0; sub_n < group_num; sub_n++)
                 {
-                     buf16_v = ((u16)para_p[1 + sub_n] << 8) + para_p[2 + sub_n];
-                     if(buf16_v >= 0xC000)
-                     {
+                    buf16_v = ((u16)para_p[1 + (sub_n << 1)] << 8) + para_p[2 + (sub_n << 1)];
+                    if(buf16_v >= 0xC000)
+                    {
                         lutec_join_group(buf16_v);
-                     }
+                    }
                 }               
             }
         break;
@@ -1308,13 +1682,29 @@ void lutec_device_addr_control(u8* para_p, u16 s_addr, u8 para_l)
             if((para_l >= 3) && (((para_l - 1) % 2) == 0))
             {
                 u8 group_num = (para_l - 1) / 2;
-                for(u8 sub_n = 0; sub_n < group_num; sub_n++)
+                if(group_num > 8) 
                 {
-                     buf16_v = ((u16)para_p[1 + sub_n] << 8) + para_p[2 + sub_n];
-                     if(buf16_v >= 0xC000)
-                     {
-                        lutec_exit_group(buf16_v);
-                     }
+                    return;
+                }
+                // hal_uart_send(&para_l, 1);
+                // hal_uart_send(&group_num, 1);
+                for(u8 sub_m = 0; sub_m < group_num; sub_m++)
+                {
+                    buf16_v = ((u16)para_p[1 + (sub_m << 1)] << 8) + para_p[2 + (sub_m << 1)];
+                    if((group_num == 1) && (buf16_v == 0xFFFF))//推出所有组
+                    {
+                        lutec_init_group();
+                        break;
+                    }
+                    else
+                    {
+                        if(buf16_v >= 0xC000)
+                        {
+                            lutec_exit_group(buf16_v);
+                        }
+                    }
+                    // hal_uart_send(&sub_m, 1);
+                    // hal_uart_send(&buf16_v, 2);
                 }               
             }
         break;
@@ -1330,20 +1720,92 @@ void lutec_device_addr_control(u8* para_p, u16 s_addr, u8 para_l)
 -------------------------------------------------------------------------*/
 u8 lutec_get_ack_addr(u8* save_ptr)
 {
+    u8 buf_cm = save_ptr[0];
+    //u16 buf_addr = lutec_get_address();
 
+    save_ptr[0] = 0x0F;
+    save_ptr[1] = (u8)(lutec_get_address() >> 8);
+    save_ptr[2] = (u8)(lutec_get_address() >> 0);
+    if(buf_cm == 1)//注册
+    {
+        return 3;
+    }
+
+    return (lutec_get_all_group_addr(&save_ptr[3]) + 3);
 }
 
 
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u8 lutec_get_device_id(u8* ip_ptr)
+{
+    u8 buf_name[14] = DEFICE_NAME;
+    
+    lutec_string_copy(ip_ptr, buf_name, 14);
+    ip_ptr[14] = DEVICE_CLASSES;
+    ip_ptr[15] = HARD_VERSION;
+    ip_ptr[16] = SOFT_VERSION;
+    u32 buf32_v = SERIAL_NUMBER;
+    ip_ptr[17] = (u8)(buf32_v >> 24);
+    ip_ptr[18] = (u8)(buf32_v >> 16);
+    ip_ptr[19] = (u8)(buf32_v >> 8);
+    ip_ptr[20] = (u8)(buf32_v >> 0);
+    buf32_v = DEVICE_FUNTICON;
+    ip_ptr[21] = (u8)(buf32_v >> 24);
+    ip_ptr[22] = (u8)(buf32_v >> 16);
+    ip_ptr[23] = (u8)(buf32_v >> 8);
+    ip_ptr[24] = (u8)(buf32_v >> 0);
+    return 25;
+}
 
 
+static u16 lutec_reply_addr = 0;
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u16 lutec_get_reply_addr(void)
+{
+    return lutec_reply_addr;
+}
 
 
+/*-------------------------------------------------------------------------
+*简  介: app连上后需要上报,显示给用户
+*参  数: 手机地址
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_updata_app_callback(u16 d_addr)
+{
+    // u8 reply_num = 0;
 
+    if(lutec_reply_addr != d_addr)//app端地址
+    {
+        lutec_reply_addr = d_addr;
+    }
 
-
-
-
-
+    //hal_uart_send(&lutec_reply_addr, 2);
+    // //------------------------推送地址
+    // u8 par_data[26] = {0};
+    // par_data[0] = 1;
+    // par_data[1] = 0x7D;
+    // par_data[2] = 0x00;    
+    // reply_num = lutec_get_ack_addr(&par_data[6]) + 7;
+    // par_data[3] = reply_num - 4;
+    // par_data[4] = 0x04;
+    // par_data[5] = (u8)(lutec_get_address() >> 8);
+    // par_data[6] = (u8)lutec_get_address(); 
+    // if(reply_num > 6)
+    // {
+    //     app_light_vendor_data_publish(d_addr, par_data, reply_num);
+    // }
+    //lutec_ack_by_bt(0x04, 0x66, d_addr);
+    //hal_uart_send(&d_addr, 2);
+}
 
 
 

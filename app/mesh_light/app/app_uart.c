@@ -92,8 +92,9 @@ void app_uart_init(void){
 #else
     #if (TY_BT_MODULE == TYBT8C)
         hal_uart_init(BAUD_RATE_9600, GPIO_UART1_TX, GPIO_UART1_RX);
-    #else
-        hal_uart_init(BAUD_RATE_9600, GPIO_UART0_TX, GPIO_UART0_RX);
+    #else//-------------------------------wwpc 20210308
+        hal_uart_init(BAUD_RATE_115200, GPIO_UART0_TX, GPIO_UART0_RX);
+        //hal_uart_init(BAUD_RATE_9600, GPIO_UART0_TX, GPIO_UART0_RX);
     #endif
 #endif
     ty_fifo_init();
@@ -136,7 +137,9 @@ void app_uart_run(void){
             PR_DEBUG_RAW("%02X ",buf[i]&0xFF); 
         }
         PR_DEBUG_RAW("\n");
-    }
+
+        //hal_uart_send(buf, len);    
+    }     
 //----------------------------------------wwpc 20210129
 #if 0
     app_factory_test_run();

@@ -208,3 +208,16 @@ void flash_set_capacity(Flash_CapacityDef flash_cap);
 
 Flash_CapacityDef flash_get_capacity(void);
 
+
+/**
+ * @brief	  This function serves to read UID of flash
+ * @param[in] idcmd - different flash vendor have different read-uid command
+ *                    GD/PUYA:0x4B; XTX: 0x5A
+ * @param[in] buf   - store UID of flash
+ * @return    none.
+ */
+void flash_read_uid(unsigned char idcmd,unsigned char *buf);
+
+
+
+
