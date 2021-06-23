@@ -35,6 +35,8 @@ void app_light_ctrl_data_onoff_response(IN bool Onoff);
 **/
 void app_light_vendor_data_publish(IN u16 DstAddr,IN u8 *VendorData,IN u8 DataLen);
 
+void app_light_vendor_data_send(IN u16 DstAddr,IN u8 *VendorData,IN u8 DataLen);
+
 void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t opcode, uint8_t *data, uint16_t data_len, uint8_t ttl);
 
 u16 tuya_get_uart_reply_addr(void);

@@ -12,27 +12,35 @@
 
 #include "lutec_tick.h"
 
+//--------------------单摄像头使用---------------------------------------------
+#define SINGLE_CAMERA_UAGE                  1  //IPC配上网后(蓝牙未配网)隐藏蓝牙
 
 
-
-
-
+//--------------------蓝牙配网-------------------------------------------------
+#define BLUETOOTH_CONFIG_NET_TIME_ENABLE    0    //重置后允许蓝牙配网时间使能
+#define MESH_CONFIG_TIME                    10   //重置后允许蓝牙配网时间10min--单位分钟
+#define BT_CONFIG_NET_BREATH_ENABLE         0    //主灯呼吸指示配网使能
 
 //--------------------调试数据串口打印------------------------------------------
-#define BT_DATA_DEBUG                       1   //打印接收发出蓝牙数据
-#define FLASH_DEBUG                         1   //打印存储数据
+#define BT_DATA_DEBUG                       0   //打印接收发出蓝牙数据 
+#define FLASH_DEBUG                         0   //打印存储数据
 #define PIR_BROADCAST_DEBUG                 0   //广播联动
+#define BT_STATUE_DEBUG                     0   //打印蓝牙模块状态
 
-//--------------------主灯闪烁使能----------------------------------------------
-#define LIGHT_BLINK_ENABLE                  0  //主灯闪烁使能
+//--------------------色温固定(单路亮度调光)------------------------------------
+#define LIGHT_TEMP_FIXED                    0   //色温固定
+#define LIGHT_DIM_CCT                       0   //CTT调光
 
 //--------------------PIR------------------------------------------------------
 #define PIR_ENABLE                          1
 #define PIR_BROADCAST_SIG_CMD_ENABLE        1  //联动使用SIG命令
 
 //--------------------按键-----------------------------------------------------
-#define USER_KEY_ENABLR                     0  //按键功能有效
-#define USER_KEY_ACTIVE_LOW                 1  //按键低电平有效
+#define USER_KEY_ENABLE                     0  //按键功能有效
+#define USER_KEY_ACTIVE_LOW                 0  //按键低电平有效
+
+//--------------------指示灯---------------------------------------------------
+#define USER_LED_ENABLE                     1  //指示灯有效
 
 //--------------------EEPROM存储-----------------------------------------------
 #define FLASH_SAVE_ENABLE                   1 //数据存储使能
@@ -45,8 +53,8 @@
 #define PIR_UPDATA_APP_DEF                   0xF1   //感应上报--使能
 #define PIR_UPDATA_WIFI_DEF                  0x01   //感应通报--使能
 #define PIR_SENSITIVITY_DEF                  0x64   //感应灵敏度--100%
-#define LUX_THRESHOLD_DEF                    0x64   //照度阈值--100% - LUX_THRESHOLD_DEF
-#define SOMEONE_LIGHT_ON_TIME                10     //有人亮灯时间--10s
+#define LUX_THRESHOLD_DEF                    0x5A   //照度阈值--- LUX_THRESHOLD_DEF
+#define SOMEONE_LIGHT_ON_TIME                5     //有人亮灯时间--5s
 #define NO_ONE_LIGHT_ON_TIME                 0     //无人低亮时间--60s
 
 
@@ -54,7 +62,7 @@
 
  //------------------设备识别码--------------------------------------------------
 //设备名称14bytes // "Camera-Light-0"//摄像灯 "OrdinaryLamp-0"//普通灯  "Battery-Lamp-0"//电池灯   "Heat-Sensor-00"//感应器  "Multi-Socket-0"//插座  "RemoteControl-"//遥控器 
-#define DEFICE_NAME                      "Camera-Light-0"
+#define DEFICE_NAME                           "Camera-Light-0"
 //设备类别: "1"(0x31)普通灯;"2"(0x32)电池灯;"3"(0x33)感应器;"4"(0x34)摄像灯;"5"(0x35)网关;"6"(0x36)插座;"7"(0x37)遥控器
 #define DEVICE_CLASSES                        0x34//摄像灯
 //硬件版本
@@ -62,7 +70,7 @@
 //软件版本   
 #define SOFT_VERSION                          0x06
 //产品序列号
-#define SERIAL_NUMBER                         0x0000000B
+#define SERIAL_NUMBER                         0x00000001
 
 /*设备功能
 bit31     bit30     bit29    bit28    bit27    bit26    bit25     bit24  
@@ -73,10 +81,14 @@ bit15     bit14     bit13    bit12    bit11    bit10    bit9      bit8
 环境湿度  环境照度    时钟     电池     云台      PIR     WiFi      HSV调光
 bit7      bit6      bit5     bit4     bit3     bit2     bit1      bit0
 RGB调光   CW调光    情景      开关     重启      报警     更新      地址分配  */
-//摄像灯 0x001C4658---0b0000 0000 0001 1100 0100 0110 0101 1000 ---觅睿摄像头灯SOC-CW
-//#define      DEVICE_FUNTICON                  0x001C4658 
+//摄像灯 0x001C4658---0b0000 0000 0001 1100 0100 0110 0101 1010 ---觅睿摄像头灯SOC-CW
+//#define      DEVICE_FUNTICON                  0x001C465A 
+
 //摄像灯 0x001C4658---0b0000 0000 0001 1100 0100 0110 0001 1000 ---觅睿摄像头灯SOC-C
-#define      DEVICE_FUNTICON                  0x001C4618 
+//#define      DEVICE_FUNTICON                  0x001C4618 
+
+//摄像灯 0x001C4658---0b0000 0000 0001 1100 0100 0111 0111 1010 ---觅睿摄像头灯SOC-RGBCW
+#define      DEVICE_FUNTICON                  0x001C477A 
 
 
 
@@ -84,17 +96,15 @@ RGB调光   CW调光    情景      开关     重启      报警     更新    
 //---------------------------------------------------------------功能定义
 #define      RESET_KEY_PRESS_TIME              500  //重置长按时间5s--单位10ms
 
-#define      MESH_CONFIG_TIME                  10   //重置后允许蓝牙配网时间10min--单位分钟
-
 
 
 //---------------------------------------------------------------wifi
 #define      WIFI_CONNECT_INQUIRE_TIME         1000  //wifi连接查询周期10s--单位10ms
-#define      WIFI_CMD_SEND_RETRY_TIME          50    //指令重发周期500ms--单位10ms
+#define      WIFI_CMD_SEND_RETRY_TIME          150    //指令重发周期1500ms--单位10ms
 #define      WIFI_RESEND_MAX_NUM               3     //重发次数
 
-#define      PIR_SOMEBODY_UPATA_TIME           900   //PIR感应有人上报间隔5s--单位10ms  
-#define      PIR_LIGHT_CONTROL_TIME            550   //PIR感应灯控组播间隔5.5s--单位10ms  
+#define      PIR_SOMEBODY_UPATA_TIME           1000   //PIR感应有人上报间隔10s--单位10ms  
+#define      PIR_LIGHT_CONTROL_TIME            9500   //PIR感应灯控组播间隔9.5s--单位10ms  
 
 
 
@@ -128,6 +138,9 @@ u8 lutec_string_compare(u8* str1_ptr, u8* str2_ptr, u8 str_len);
 void lutec_string_copy(u8* str_to, u8* str_from, u8 str_l);
 
 
+
+void lutec_u32_to_8array(u32 s_value, u8* arr_ptr);
+u32 lutec_u8array_to_u32(u8* arr_ptr);
 
 #endif
 

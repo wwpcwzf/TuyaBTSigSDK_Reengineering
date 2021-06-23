@@ -28,6 +28,8 @@ void lutec_pir_init(void);
 
 void lutec_pir_signal_pin_init(void);
 
+void lutec_pir_enable_set(u8 onoff_v);
+
 void lutec_pir_loop(void);
 
 u8 lutec_pir_someone(void);

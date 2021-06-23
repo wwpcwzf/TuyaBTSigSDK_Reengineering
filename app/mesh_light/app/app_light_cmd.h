@@ -21,7 +21,9 @@
 extern "C" {
 #endif  /* __cplusplus */
 
-#define APP_DATA_AUTO_SAVE_DELAY_TIME       5000
+
+//--------------------------------------------------------------wwpc 20210422  延长时间减少对蓝牙接收数据的接收
+#define APP_DATA_AUTO_SAVE_DELAY_TIME       9600  //5000
 
 
 #include "ty_light_save_user_flash.h"

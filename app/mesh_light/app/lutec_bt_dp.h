@@ -27,6 +27,8 @@
 
 	void lutec_bluetooth_dp_data(u16 s_addr, u16 d_addr, u8 *par, int par_len);
 
+    u8 lutec_sigmesh_dp_analysis(u8* cmd_ptr, u8 return_flag);
+
     u8 lutec_protocol_dp_analysis(u8 *par);
 
     void lutec_ack_by_bt(uint8_t point_to, uint8_t ack_id, uint16_t sent_to_addr);
@@ -65,11 +67,17 @@
 
     u8 lutec_get_pir_para(u8* g_ptr);
 
-    void lutec_get_pir_dim_para(u32* noone_t, u8* noone_p, u32* someone_t, u8* someone_p);
+    void lutec_set_pir_dim_temperature(u16 temp_v);
+
+    u16 lutec_get_pir_dim_temperature(void);
+
+    void lutec_get_pir_dim_para(u8* noone_p, u8* someone_p);
     
     void lutec_set_pir_dim_para(u32 noone_t, u8* noone_p, u32 someone_t, u8* someone_p);
 
-    u32 lutec_get_pir_delay_time(u8 any_one);
+    u32 lutec_get_pir_delay_time_s(u8 any_one);
+
+    u32 lutec_get_pir_delay_time_10ms(u8 any_one);
 
     void lutec_pir_dimmer(u8 any_one);
 

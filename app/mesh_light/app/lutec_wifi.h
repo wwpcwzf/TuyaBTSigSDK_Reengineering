@@ -34,7 +34,7 @@
 
     void lutec_wifi_net_config(u8 cmd_order_number);
 
-	void lutec_uart_server_run(void);
+    void lutec_remote_bt_cmd(u8* bt_data_ptr);
 
     u8 lutec_get_order_number(void);
 
@@ -54,7 +54,15 @@
 
     void lutec_reset_wifi_module(void);
 
+    void lutec_remote_sig_mesh_data(u8* data_ptr, u8 data_l);
+
+    void lutec_sig_data_forwording(u8* data_pt, u16 t_addr);
+
 	void lutec_remote_bluetooth_data(u8* data_ptr, u8 data_l);
+
+    void lutec_sig_dp_replay(u8 cmd_byte, u8 data_length, u16 addr_v, u8* sig_dp_ptr);
+
+    void lutec_sig_up_by_wifi(u8 cmd_byte, u8 data_length, u8* data_ptr);
 
     void lutec_ack_by_wifi(u8 ackid);
 

@@ -1,7 +1,7 @@
 {
     "name": "oem_2cw_tlsr8250_light2_pwm_user",
     "description": "mesh rgbwcl online oem cfg",
-    "version": "1.0",
+    "version": "1.3",
     "ic":"tlsr825x",
     "hardware":"TYBT3L",
     "build":{
@@ -20,7 +20,7 @@
         "pid":"xl2yyswh",
         "vendorid":"1012",
 	    "power_reset_cnt":"5",
-        "power_reset_time":"5",
+        "power_reset_time":"0",
         "power_reset_recover_time":"600",
         "local_control":"0"
     },

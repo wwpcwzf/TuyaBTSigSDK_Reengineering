@@ -12,7 +12,9 @@
 
 
 
+#include "hal_gpio.h"
 #include "hal_uart.h"
+#include "hal_pwm.h"
 #include "ty_timer_event.h"
 #include "app_light_cmd.h"
 #include "ty_light_save_soc_flash.h"
@@ -27,6 +29,9 @@
 #include "lutec_wifi.h"
 
 
+#include "ty_string_op.h"
+
+
 static u8 device_state = 0x51;
 
 
@@ -34,13 +39,15 @@ static u16 self_address = 0;
 static u8 self_group_num = 0;
 static u16 self_group_address_list[8] = {0};
 
-#if LIGHT_BLINK_ENABLE  //蓝牙未配网大灯闪烁时基及标志
-    static u32 light_blink_time_base = 0;
-#endif
+static u8 mesh_connect_flag = 0;
 
+static u8 self_pir_dimmer_enable_flag = 1;
 
-
-
+u8 lutec_get_mesh_connect_lfag(void)
+{
+    //hal_uart_send(&mesh_connect_flag, 1); 
+    return mesh_connect_flag;
+}
 
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -52,7 +59,15 @@ void lutec_light_control_by_lux(void)
     
 
 }
-
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_self_pir_dimmer_onoff(u8 set_val)
+{
+    self_pir_dimmer_enable_flag = set_val > 0 ? 1 : 0;
+}
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: u8 any_one（0-结束；1-无人；2-有人）
@@ -60,8 +75,11 @@ void lutec_light_control_by_lux(void)
 -------------------------------------------------------------------------*/
 void lutec_someone_control(u8 any_one)
 {
-     //自身感应亮灯               
-    lutec_pir_dimmer(any_one);//有人
+    //自身感应亮灯     
+    if(self_pir_dimmer_enable_flag > 0)    
+    {      
+        lutec_pir_dimmer(any_one);//有人
+    }
     //发送联动指令    
 #if PIR_BROADCAST_DEBUG 
     //hal_uart_send(&any_one, 1); 
@@ -92,7 +110,16 @@ void lutec_set_pir_someone(void)
     pir_control_flag = 0x01;
     multicast_time_base = lutec_get_tick_10ms();
 }
-
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_stop_pir_someone_flow(void)
+{
+    pir_control_flag = 0;
+    multicast_time_base = 0;
+}
 
 
 /*-------------------------------------------------------------------------
@@ -105,16 +132,16 @@ void lutec_pir_light_control(void)
 
     u8 some_one_buf = 0;
 
-    if(lutec_get_switch_flag() != 0x02)
-    {
-        //更新状态，开始计时
-        if(pir_control_flag > 0)
-        {
-            pir_control_flag = 0x00;
-            multicast_time_base = 0x00;
-        }
-        return;
-    }
+    // if(lutec_get_switch_flag() != 0x02)//常亮或者长灭
+    // {
+    //     //更新状态，开始计时
+    //     if(pir_control_flag > 0)
+    //     {
+    //         pir_control_flag = 0x00;
+    //         multicast_time_base = 0x00;
+    //     }
+    //     return;
+    // }
     // static u32 timebase = 0;
     //  if(lutec_get_interval_tick_10ms(timebase) > 200)
     //  {
@@ -130,7 +157,7 @@ void lutec_pir_light_control(void)
     switch(pir_control_flag)
     {
     case 0x00://空闲
-        if(lutec_get_lux_flag() == 0x00)//不是自动灯控档||照度未达到限值
+        if(lutec_get_lux_flag() == 0x00)//照度未达到限值
         {
             break;
         }
@@ -155,7 +182,7 @@ void lutec_pir_light_control(void)
         }
         else//PIR无人
         {
-            if(lutec_get_interval_tick_10ms(multicast_time_base) > lutec_get_pir_delay_time(1))//有人亮灯时间到
+            if(lutec_get_interval_tick_10ms(multicast_time_base) > lutec_get_pir_delay_time_10ms(1))//有人亮灯时间到
             {                       
                 lutec_someone_control(0x01);
                 //更新状态，开始计时
@@ -174,9 +201,9 @@ void lutec_pir_light_control(void)
         }
         else//PIR无人
         {
+            u32 buffer_time = lutec_get_interval_tick_10ms(multicast_time_base);
             //无人亮灯时间到 || 10分钟后照度超过阈值
-            if((lutec_get_interval_tick_10ms(multicast_time_base) > lutec_get_pir_delay_time(0)) 
-            || ((lutec_get_interval_tick_10ms(multicast_time_base) > 600) && (lutec_get_lux_flag() == 0x00)))
+            if(((buffer_time > 60000) && (lutec_get_lux_flag() == 0x00)) || (buffer_time > lutec_get_pir_delay_time_10ms(0)))
             {
                 lutec_someone_control(0x00);
                 //更新状态，开始计时
@@ -372,13 +399,47 @@ void lutec_main_init(void)
 	lutec_pir_init();
 #endif
     lutec_lux_init();
-#if USER_KEY_ENABLR
+#if USER_KEY_ENABLE
     lutec_key_init();
 #endif
+#if USER_LED_ENABLE
     lutec_led_init(); 
+#endif
     lutec_regain_all_addr();
-    lutec_saved_data_init();
+    lutec_saved_data_init();    
+#if LIGHT_DIM_CCT
+    lutec_cct_temp_pin_init();
+#endif
+#if 0 //测试转换函数
+    u8 hex_string[4] = {'a','b','9','F'};
+    u8 result = 0;
+    u8 hex_arr[2] = {0};
+    hal_uart_send(hex_string, 4);
+    hal_uart_send(&result, 1);
+    hal_uart_send(hex_arr, 2);
+    result = ty_string_op_hexstr2hex(hex_string, 4, hex_arr);
     
+    hal_uart_send(hex_string, 4);
+    hal_uart_send(&result, 1);
+    hal_uart_send(hex_arr, 2);
+    hex_arr[0] = 0xF5;
+    hex_arr[1] = 0xa8;
+
+    result = ty_string_op_hexarry2hexstr(hex_string, 4, hex_arr);        
+
+    hal_uart_send(hex_string, 4);
+    hal_uart_send(&result, 1);
+    hal_uart_send(hex_arr, 2);
+
+    u16 buf16_v = 0x55aa;
+
+    result = ty_string_op_hex2hexstr(hex_string, 4, buf16_v);     
+
+    hal_uart_send(hex_string, 4);
+    hal_uart_send(&result, 1);
+    hal_uart_send(hex_arr, 2);
+#endif
+
 }
 
 
@@ -390,13 +451,15 @@ void lutec_main_init(void)
 void lutec_main_loop(void)
 {
     lutec_lux_loop();
-#if USER_KEY_ENABLR
+#if USER_KEY_ENABLE
     lutec_key_loop();
 #endif
 #if PIR_ENABLE
     lutec_pir_loop();
 #endif
+#if USER_LED_ENABLE
     lutec_led_loop();
+#endif
 
     lutec_device_loop();    
     
@@ -448,8 +511,6 @@ void lutec_device_loop(void)
     //---------------------------------------WiFi
     lutec_wifi_control_loop();
 
-    //---------------------------------------大灯闪
-    lutec_light_blink_control();
     
     //---------------------------------------休眠
     //hal_cpu_sleep_wakeup(HAL_SUSPEND_MODE, HAL_PM_WAKEUP_PAD|HAL_PM_WAKEUP_TIMER, hal_clock_get_system_tick() + 250*1000*HAL_CLOCK_1US_TICKS);
@@ -457,41 +518,6 @@ void lutec_device_loop(void)
 }
 
 
-/*-------------------------------------------------------------------------
-*简  介: 
-*参  数: 
-*返回值: 
--------------------------------------------------------------------------*/
-void lutec_light_blink_control(void)
-{
-#if LIGHT_BLINK_ENABLE
-    static u8 blink_flag = 0;
-    if(light_blink_time_base > 0)
-    {
-        if(lutec_get_interval_tick_10ms(light_blink_time_base) > 150)//1s
-        {
-            if((blink_flag % 2) == 0)
-            {
-                app_light_ctrl_data_switch_set(0);
-                app_light_ctrl_data_countdown_set(0);
-                app_light_ctrl_proc();
-            }
-            else
-            {
-                app_light_ctrl_data_switch_set(1);
-                app_light_ctrl_data_countdown_set(0);
-                app_light_ctrl_proc();
-            }
-            light_blink_time_base = lutec_get_tick_10ms();
-            blink_flag++;
-            if(blink_flag >= 10)
-            {
-                light_blink_time_base = 0;
-            }
-        }
-    }
-#endif
-}
 /*-------------------------------------------------------------------------
 *简  介: 
 *参  数: 
@@ -522,10 +548,6 @@ void lutec_config_close_callback(void)
 {
     lutec_led_flash_set(0);//不闪
     lutec_led_onoff(0);//关灯
-#if LIGHT_BLINK_ENABLE
-    light_blink_time_base = 0;
-    lutec_set_switch_flag(SWITCH_ONOFF_DEF); 
-#endif
 }
 
 /*-------------------------------------------------------------------------
@@ -535,25 +557,37 @@ void lutec_config_close_callback(void)
 -------------------------------------------------------------------------*/
 void lutec_mesh_state_callback(mesh_state_t m_state)
 {
-  switch(m_state) 
-  {
-    case NODE_POWER_ON_UNPROVISION: //上电未配网
-    #if LIGHT_BLINK_ENABLE
-        light_blink_time_base = lutec_get_tick_10ms();        
-        lutec_set_switch_flag(0);
-    #endif
-        lutec_led_flash_set(50);//快闪0.5s
-        break;
-    case NODE_PROVISION_SUCCESS://配网成功    
-    #if LIGHT_BLINK_ENABLE   
-        lutec_set_switch_flag(SWITCH_ONOFF_DEF);     
-    #endif 
-        //break;   
-    case NODE_POWER_ON_IN_MESH://上电已配网   
-    #if LIGHT_BLINK_ENABLE    
-        light_blink_time_base = 0; 
+
+    #if BT_STATUE_DEBUG
+    u8 flag_date[2] = {0xEE, 0x00};
     #endif
 
+    switch(m_state) 
+    {
+    case NODE_PROVISION_SUCCESS://配网成功 
+        #if BT_STATUE_DEBUG   
+            flag_date[1] = 0xE5;
+            hal_uart_send(flag_date, 2);
+        #endif
+
+        lutec_led_flash_set(100);//慢闪1s
+        lutec_regain_all_addr();
+        //reg_pwdn_ctrl |= FLD_PWDN_CTRL_REBOOT; //重启MCU
+        if(device_state < 0x54)
+        {
+            device_state = 0x54;//运行状态                
+            #if FLASH_SAVE_ENABLE
+            //app_light_ctrl_data_auto_save_start(60000);
+            lutec_save_data();
+            #endif
+        }
+        mesh_connect_flag = 1;
+    break;   
+    case NODE_POWER_ON_IN_MESH://上电已配网 
+        #if BT_STATUE_DEBUG   
+            flag_date[1] = 0xE4;
+            hal_uart_send(flag_date, 2);
+        #endif
         lutec_regain_all_addr();
         if(lutec_get_wifi_state() == 0x74)//wifi联网成功
         {   //常亮         
@@ -564,34 +598,46 @@ void lutec_mesh_state_callback(mesh_state_t m_state)
         {
             lutec_led_flash_set(100);//慢闪1s
         }
-        if(device_state == 0x53)
-        {
-            device_state = 0x54;//运行状态                
-            #if FLASH_SAVE_ENABLE
-            app_light_ctrl_data_auto_save_start(5000);
-            #endif
-        }
-        break;
-    case NODE_KICK_OUT://重置完成
-    {
-        u8 flag_date[2] = {0xEE, 0xE1};
-        //hal_uart_send(flag_date, 2);
-        //lutec_reset_wifi_module();//重置WiFi模块
+        mesh_connect_flag = 1;
+    break;
+    case NODE_POWER_ON_UNPROVISION: //上电未配网
+        #if BT_STATUE_DEBUG   
+            flag_date[1] = 0xE3;
+            hal_uart_send(flag_date, 2);
+        #endif
         lutec_led_flash_set(50);//快闪0.5s
         lutec_init_all_addr();
         lutec_init_saved_data();
-
-        #if LIGHT_BLINK_ENABLE
-        light_blink_time_base = lutec_get_tick_10ms();        
-        lutec_set_switch_flag(0);
-        #endif
-    }
+        mesh_connect_flag = 0;
     break;
-    case NODE_MESH_RESET://mesh网络重置 --？
-        lutec_led_flash_set(50);//快闪0.5s   
+    case NODE_KICK_OUT://重置完成
+        #if BT_STATUE_DEBUG   
+            flag_date[1] = 0xE2;
+            hal_uart_send(flag_date, 2);
+        #endif
+        lutec_led_flash_set(50);//快闪0.5s
+        lutec_init_all_addr();
+        lutec_init_saved_data();        
+        //reg_pwdn_ctrl |= FLD_PWDN_CTRL_REBOOT;
+        mesh_connect_flag = 0;
+    break;
+    case NODE_MESH_RESET://mesh网络重置 
+        #if BT_STATUE_DEBUG   
+            flag_date[1] = 0xE1;
+            hal_uart_send(flag_date, 2);
+        #endif
+        lutec_led_flash_set(50);//快闪0.5s  
+        lutec_init_all_addr();
+        mesh_connect_flag = 0;
     break;
     case NODE_RECOVER_IN_MESH://恢复网络
+        #if BT_STATUE_DEBUG   
+            flag_date[1] = 0xE0;
+            hal_uart_send(flag_date, 2);
+        #endif
         lutec_regain_all_addr();
+        lutec_led_flash_set(100);
+        mesh_connect_flag = 1;
     break;
     case TY_OTA_START:    
     break;
@@ -600,16 +646,16 @@ void lutec_mesh_state_callback(mesh_state_t m_state)
     break;
     case TY_GROUP_SUB_ADD://加入组 --测试
         lutec_regain_all_addr();
-        lutec_send_group_sddr();
+        //lutec_send_group_sddr();
     break;
     case TY_GROUP_SUB_DEL://退出组 --测试
         lutec_regain_all_addr();
-        lutec_send_group_sddr();
+        //lutec_send_group_sddr();
     break;
     default:
 
     break;
-  }
+    }
 
 }
 
@@ -802,6 +848,7 @@ void lutec_save_data(void)
 
     LUTEC_DATA_FLASH_T save_data_buf;
 
+
     memset(&save_data_buf, 0, sizeof(LUTEC_DATA_FLASH_T));     
     save_data_buf.f_save_flag = 0xA55A;
     save_data_buf.f_devicce_state = device_state;
@@ -810,13 +857,17 @@ void lutec_save_data(void)
     save_data_buf.f_pir_inform_en = lutec_pir_report_is_enable();
     save_data_buf.f_pir_sensitivity = lutec_pir_get_sensitivity();
     save_data_buf.f_lux_threshold = lutec_get_lux_threshold();
-    lutec_get_pir_dim_para(&save_data_buf.f_noone_time, save_data_buf.f_noone_dim_p, &save_data_buf.f_someone_time, save_data_buf.f_someone_dim_p);    
+    save_data_buf.f_someone_time = lutec_get_pir_delay_time_s(1);
+    save_data_buf.f_noone_time = lutec_get_pir_delay_time_s(0);
+    lutec_get_pir_dim_para(save_data_buf.f_noone_dim_p, save_data_buf.f_someone_dim_p);    
 
+    #if FLASH_DEBUG    
+    hal_uart_send(&save_data_buf, sizeof(LUTEC_DATA_FLASH_T));
+    #endif
     ty_light_save_soc_flash_erase_sector(EEPROM_START_ADDRESS);
     ty_light_save_soc_flash_write(EEPROM_START_ADDRESS, &save_data_buf, sizeof(LUTEC_DATA_FLASH_T));
     
     #if FLASH_DEBUG    
-    hal_uart_send(&save_data_buf, sizeof(LUTEC_DATA_FLASH_T));
     memset(&save_data_buf, 0, sizeof(LUTEC_DATA_FLASH_T));  
     ty_light_save_soc_flash_read(EEPROM_START_ADDRESS, sizeof(LUTEC_DATA_FLASH_T), &save_data_buf);    
     hal_uart_send(&save_data_buf, sizeof(LUTEC_DATA_FLASH_T));
@@ -907,7 +958,7 @@ void lutec_send_bright_sig_cmd(u16 dst_addr, u16 brightness_buffer)
     para_buf[0] = temp_buf;
     para_buf[1] = temp_buf >> 8;
     //                     源地址            目标地址          操作码              参数      参数长度
-    tuya_mesh_data_send(lutec_get_address(), dst_addr, TUYA_LIGHTNESS_SET_NOACK, para_buf,    2,    0,    1);//亮度
+    tuya_mesh_data_send(lutec_get_address(), dst_addr, TUYA_LIGHTNESS_SET_NOACK, para_buf,    2,    0,    0);//亮度
 }
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -923,16 +974,31 @@ void lutec_send_temperature_sig_cmd(u16 dst_addr, u16 temp_para)
     para[0] = temp_buf;
     para[1] = temp_buf >> 8;
     //                     源地址            目标地址          操作码              参数      参数长度
-   tuya_mesh_data_send(lutec_get_address(), 0xFFFF, TUYA_LIGHT_CTL_TEMP_SET_NOACK, para, 4, 0, 1);//色温
+   tuya_mesh_data_send(lutec_get_address(), 0xFFFF, TUYA_LIGHT_CTL_TEMP_SET_NOACK, para, 4, 0, 0);//色温
 }
 
 
 
 
+//cct调光的色温PWM输出引脚初始化
+#if LIGHT_DIM_CCT
+void lutec_cct_temp_pin_init(void)
+{
+    hal_gpio_set_func(GPIO_PC3, GPIO_FUNC_AS_PWM);
+    //PWM时钟源24mHz，24mHz = 12000 * 2kHz, 占空比7%计数 = 7 * 12000 /100 = 84
+    //PWM通道，计数周期，比较值
+	hal_pwm_set(PWM1_ID, 12000, 840);
+	hal_pwm_start(PWM1_ID);
+
+}
 
 
-
-
+//cct调光的色温PWM输出函数
+void lutec_set_cct_temperature(u16 ct_temp)
+{
+    hal_pwm_set_cmp(PWM1_ID, ct_temp * 12);
+}
+#endif
 
 
 

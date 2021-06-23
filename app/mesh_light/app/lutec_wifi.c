@@ -5,7 +5,7 @@
         | wwpc       2021/1/26        Create
         |
 ******************************************************************************************/
-
+#include "tuya_light_model.h"
 
 #include "lutec_wifi.h"
 
@@ -20,9 +20,14 @@
 
 #include "lutec_led.h"
 
+#include "ty_string_op.h"
+#include "ty_light_basis_tools.h"
+#include "app_light_cmd.h"
+#include "app_light_prompt.h"
 
 
-static u8 wifi_module_connect_flag = 0;//模块连接标志
+
+static u8 wifi_module_connect_flag = 0;//模块连接标志caiji
 
 static u8 wifi_state = 0x00;
 
@@ -93,7 +98,7 @@ void lutec_wifi_control_loop(void)
             if(send_retry_flag & 0x01)//配网重发
             {                
                 lutec_wifi_net_config(wifi_config_order_num);
-                if(net_config_counter++ >= WIFI_RESEND_MAX_NUM)
+                if(net_config_counter++ >= 5)//WIFI_RESEND_MAX_NUM)
                 {
                     net_config_counter = 0;
                     send_retry_flag &= ~0x01;
@@ -196,96 +201,32 @@ void lutec_wifi_net_config(u8 cmd_order_number)
 
 
 /*-------------------------------------------------------------------------
-*简  介: 
-*参  数: 
+*简  介: 对自定义数据点|标准指令数据点的区分和初步解析或者转发
+*参  数: 命令字|数据长度|数据
 *返回值: 
 -------------------------------------------------------------------------*/
-void lutec_uart_server_run(void)
+void lutec_remote_bt_cmd(u8* bt_data_ptr)   
 {
-	u8 num = ty_fifo_get_size();
+	u8 data_len = 0;
+    u16 buffer16_v  = 0;
 
-	if(num < BT_MIN_PACKET_LEN) // BT_MIN_PACKET_LEN = 7
-	{
-		return;
-	} 
-	//1?judge head
-	u8 data_buf[255] = {0};
-	ty_fifo_read(data_buf, BT_MIN_PACKET_LEN);
-    //识别帧头版本：WiFi(觅睿) = 0x5656 01；蓝牙(涂鸦)  0x55aa 00；串口(lutec) 0x5AA5 00
-	if(((data_buf[0] != 0x56) || (data_buf[1] != 0x56) || (data_buf[4] != 0x01)) 
-    && ((data_buf[0] != 0x55) || (data_buf[1] != 0xAA) || (data_buf[2] != 0x00)) 
-    && ((data_buf[0] != 0x5A) || (data_buf[1] != 0xA5) || (data_buf[2] != 0x00)))
-	{
-		ty_fifo_pop(1);
-		return;
-	}
-    
-    //hal_uart_send(data_buf, BT_MIN_PACKET_LEN);
+    data_len = bt_data_ptr[2];//数据长度
 
-	//2.judge if it's a whole frame
-	u16 data_len = 0;
-    if((data_buf[0] == 0x56) && (data_buf[1] == 0x56))//wifi帧
+    if(bt_data_ptr[0] == 0x06)//远程自定义数据点
     {
-        data_len = ((u16)data_buf[2] << 8) + data_buf[3] + 4;
-        if((data_len > MAX_PACKET_LEN) || (data_len < WIFI_MIN_PACKET_LEN))
-        {
-            ty_fifo_pop(2);
-            return;
-        }
+        lutec_remote_bluetooth_data(&bt_data_ptr[3], data_len);//dpID|数据类型|参数长度|参数，           
     }
-    else if((data_buf[0] == 0x55) && (data_buf[1] == 0xAA))//蓝牙帧
+    else if((bt_data_ptr[0] == 0x0C)||(bt_data_ptr[0] == 0x14))//远程标准sigmensh指令
     {
-        data_len = ((u16)data_buf[4] << 8) + data_buf[5] + 7;
-        if((data_len < BT_MIN_PACKET_LEN) || (data_len > MAX_PACKET_LEN))
-        {
-            ty_fifo_pop(2);
-            return;
-        }
+        //hal_uart_send(bt_data_ptr,data_len+3); 
+        lutec_remote_sig_mesh_data(&bt_data_ptr[3], data_len);//地址长度|地址|dpID|数据类型|参数长度|参数
+        //if(bt_data_ptr[0] == 0x14)//组控
+        //{
+            lutec_sig_up_by_wifi(bt_data_ptr[0], 0, &data_len);
+        //}  
     }
-    else //自定义串口指令: 帧头[2]||版本[1]||命令[1]||长度(参数+校验)[2]||参数[n]|校验(帧头~参数)[1]
-    {
-        data_len = ((u16)data_buf[4] << 8) + data_buf[5] + 6;
-        if((data_len > MAX_PACKET_LEN) || (data_len < 7))
-        {
-            ty_fifo_pop(2);
-            return;
-        }
-    }
-    if(data_len > num)//未接收完数据包
-    {
-        return;
-    }
-
-	
-	//3.judge check sum 
-	ty_fifo_read(data_buf, data_len);
-	u8 ck_sum = 0;
-	ck_sum = lutec_check_sum(data_buf, data_len - 1);
-	if(ck_sum != data_buf[data_len - 1])
-	{
-		ty_fifo_pop(2);
-		return;
-	}
-	ty_fifo_pop(data_len); //释放缓存
-
-	//4.数据处理
-	switch(data_buf[1])
-	{
-    case 0x56: //wifi模组数据
-        wifi_module_connect_flag = 1;
-        //hal_uart_send(data_buf, data_len);  
-        lutec_wifi_module_data(&data_buf[5], data_len - 6);//序号|类别|命令|数据，长度            
-		break;
-    case 0xA5: //串口产测指令
-
-		break;
-    case 0xAA: //蓝牙远程下行数据     
-        //hal_uart_send(data_buf, data_len);         //-------------测试
-        lutec_remote_bluetooth_data(&data_buf[6], data_len - 7);//dpID|数据类型|参数长度|参数，           
-		break;
-    default:
-		break;
-	}
+    else
+    {}
 }
 
 
@@ -307,6 +248,8 @@ u8 lutec_get_order_number(void)
 void lutec_wifi_module_data(u8* cmd_ptr, u8 para_l)
 {
     u8 return_count = 0;
+
+    wifi_module_connect_flag = 1;
 	switch(cmd_ptr[2])
 	{
         case 0x00: //心跳
@@ -392,14 +335,59 @@ void lutec_wifi_module_data(u8* cmd_ptr, u8 para_l)
 
 /*-------------------------------------------------------------------------
 *简  介: 
-*参  数: 序号|类别|命令[2]|数据，长度  
+*参  数: 序号|类别|命令[2]|数据，长度   01 00 01 00 01 02 
 *返回值: 
 -------------------------------------------------------------------------*/
 u8 lutec_mr_wifi_dp(u8* para_ptr, u8 par_l)
 {
+    u8 return_num = 0;
+    //hal_uart_send(para_ptr, par_l);
+
+    if(para_ptr[3] > 0) return 0;//dpID错误
     switch(para_ptr[4])
     {
-    case 0x01://开关灯1
+    case 0x01://开关灯1        
+        if(par_l == 6)
+        {
+            switch(para_ptr[5])
+            {
+            case 0x00://PIR灯控
+                break;
+            case 0x01://常亮
+                app_light_ctrl_data_switch_set(TRUE);
+                app_light_ctrl_data_countdown_set(0);
+                app_light_ctrl_data_auto_save_start(APP_DATA_AUTO_SAVE_DELAY_TIME);
+                break;
+            case 0x02://常灭            
+                app_light_ctrl_data_switch_set(FALSE);
+                app_light_ctrl_data_countdown_set(0);
+                app_light_ctrl_data_auto_save_start(APP_DATA_AUTO_SAVE_DELAY_TIME);
+                break;
+            case 0x03://亮灯5s
+                app_light_ctrl_data_switch_set(TRUE);
+                app_light_ctrl_data_countdown_set(5);
+                break;
+            case 0x04://闪烁
+                break;
+            case 0x05://傍晚亮灯3H
+                break;
+            case 0x06://傍晚亮灯6H
+                break;
+            case 0x07://晚上常亮
+                break;
+            default:
+                para_ptr[3] = 4;//错误码
+                return_num = 1;
+                break;
+            }
+            return_num = 3;
+            app_light_ctrl_proc();
+        }
+        else
+        {
+            para_ptr[3] = 2;
+            return_num = 1;
+        } 
         break;
     case 0x02://亮度[2]
         break;
@@ -428,7 +416,7 @@ u8 lutec_mr_wifi_dp(u8* para_ptr, u8 par_l)
     default:
         break;
     }
-    return 0;
+    return return_num;
 }
 
 
@@ -511,6 +499,13 @@ u8 lutec_wifi_dp(u8* para_ptr, u8 par_l)
             {
                 wifi_state = para_ptr[4];
                 lutec_updata_by_bt(0x04, 0x7F, &wifi_state, 1, lutec_get_reply_addr());
+                #if SINGLE_CAMERA_UAGE 
+                if(((wifi_state == 0x73) || (wifi_state == 0x74)) && (lutec_get_mesh_connect_lfag() == 0))
+                {
+                    tuya_gatt_adv_beacon_enable(0);//停止广播，隐藏蓝牙
+                    //hal_uart_send(&wifi_state, 1);
+                }
+                #endif
             }
             break;
         case 0x80: //128 WiFi模组识别
@@ -566,28 +561,246 @@ void lutec_reset_wifi_module(void)
     send_retry_flag |= 0x02;
 }
 
+/*-------------------------------------------------------------------------
+*简  介: 蓝牙远程下行sigmesh标准数据点处理：解析自己的点播指令，其余转发。
+*参  数: 地址长度|地址|dpID|数据类型|功能长度|功能指令
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_remote_sig_mesh_data(u8* data_ptr, u8 data_l)
+{
+    u16 addr_buf = 0;
+    u16 data_len = 0;
+    u8* cmd_ptr = 0;
+
+    
+    //hal_uart_send(data_ptr,data_l); 
+    //--------------------------------------拆解数据帧
+    if(data_ptr[0] == 0x02)
+    {
+        addr_buf = (data_ptr[1] << 8) + data_ptr[2];
+        data_len = (data_ptr[5] << 8) + data_ptr[6];
+        if(data_l != data_len + 7)
+        {
+            return;
+        }
+        // dpID|数据类型|功能长度[2]|功能指令
+        cmd_ptr = &data_ptr[3];
+    }
+    else if(data_ptr[0] == 0x04)
+    {
+        u8 data_buf[2] = {0};
+        //u8 ty_string_op_hexstr2hex(u8 *hexstr,int len,u8 *hex)
+        ty_string_op_hexstr2hex(&data_ptr[1], 4, data_buf);
+        addr_buf = (data_buf[0] << 8) + data_buf[1];
+        data_len = (data_ptr[7] << 8) + data_ptr[8];
+        if(data_l != data_len + 9)
+        {
+            return;
+        }
+        // dpID|数据类型|功能长度|功能指令
+        cmd_ptr = &data_ptr[5];
+    }
+    else
+    {
+        return;
+    }
+    //hal_uart_send(data_ptr,data_l); 
+    //---------------------------------------指令路由--解析
+    if((lutec_get_address() == addr_buf) || (addr_buf == 0x0000))//自己的数据 或者网关数据---不转发
+    {
+        u8 replay_len = 0;
+        replay_len = lutec_sigmesh_dp_analysis(cmd_ptr, 1);//dp解析
+        if(replay_len > 3)
+        {
+            lutec_sig_dp_replay(0x0D, replay_len, lutec_get_address(), cmd_ptr);
+        }
+    }
+    else
+    {
+        //hal_uart_send(&addr_buf,2); 
+        if((addr_buf == 0xFFFF) || (lutec_is_own_group(addr_buf) != 0))//自己的组播数据
+        {
+            //hal_uart_send(cmd_ptr, data_len + 4); 
+            lutec_sigmesh_dp_analysis(cmd_ptr, 0);//dp解析
+        }
+        //参数指针 dpID[1] | 数据类型[1] | 功能长度[2] | 功能指令[n]
+        // 下标     0        1             2      3     4.......
+        lutec_sig_data_forwording(cmd_ptr, addr_buf);//转发
+    }
+}
 
 /*-------------------------------------------------------------------------
-*简  介: 蓝牙远程下行数据处理：解析自己的点播指令，其余转发。
-*参  数: 
+*简  介: 蓝牙远程下行数据点转发, 内部参数和指令ID转换
+*参  数: 数指针 dpID[1] | 数据类型[1] | 功能长度[2] | 功能指令[n]
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_sig_data_forwording(u8* data_pt, u16 t_addr)
+{
+    //hal_uart_send(&t_addr,2); 
+    //hal_uart_send(data_pt, data_pt[3] + 4); 
+    //参数指针 dpID[1] | 数据类型[1] | 功能长度[2] | 功能指令[n]
+    // 下标     0        1             2      3     4.......
+    switch(data_pt[0])
+    {
+    case 0x01://开关  TUYA_G_ONOFF_SET
+        //                       源地址          目标地址        操作码        数据       数据长度      是否为响应
+        tuya_mesh_data_send(lutec_get_address(), t_addr, TUYA_G_ONOFF_SET, &data_pt[4],   1,     0,    0);//开关
+        break;
+    case 0x02://模式  TUYA_VD_TUYA_WTITE
+        //                       源地址          目标地址        操作码          数据       数据长度      是否为响应
+        tuya_mesh_data_send(lutec_get_address(), t_addr, TUYA_VD_TUYA_WTITE, &data_pt[4],   1,     0,    0);
+        break;
+    case 0x03://亮度  TUYA_LIGHTNESS_SET  
+    {
+        u32 buffer32_v = 0;
+        //u16 buf_d = 0;// void lutec_u32_to_8array(u32 s_value, u8* arr_ptr)  u32 lutec_u8array_to_u32(u8* arr_ptr)
+        buffer32_v = lutec_u8array_to_u32(&data_pt[4]);
+        if(buffer32_v > 1000)
+        {
+            buffer32_v = 1000;
+        }
+        buffer32_v = (u32)((float)buffer32_v * 65.535);
+        //                       源地址          目标地址        操作码        数据   数据长度      是否为响应
+        tuya_mesh_data_send(lutec_get_address(), t_addr, TUYA_LIGHTNESS_SET, &buffer32_v,   4,     0,    0);
+    }
+        break;
+    case 0x04://冷暖值   TUYA_LIGHT_CTL_TEMP_SET
+    {
+        u32 buffer32_v = 0;
+        //u8 buf_d = 0;// void lutec_u32_to_8array(u32 s_value, u8* arr_ptr)  u32 lutec_u8array_to_u32(u8* arr_ptr)
+        buffer32_v = lutec_u8array_to_u32(&data_pt[4]);
+        if(buffer32_v > 1000)
+        {
+            buffer32_v = 1000;
+        }
+        buffer32_v = (u32)(((float)buffer32_v * 19.2) + 800.0);
+        hal_uart_send(&buffer32_v,   4); 
+        //                       源地址          目标地址        操作码             数据   数据长度      是否为响应
+        tuya_mesh_data_send(lutec_get_address(), t_addr, TUYA_LIGHT_CTL_TEMP_SET, &buffer32_v,   4,     0,    0);
+    }
+        break;
+    case 0x05://彩光  TUYA_LIGHT_HSL_SET
+    {      
+        u16 hsv_h = 0, hsv_s = 0, hsv_v = 0;
+        u8 buf_ar[2] = {0};
+        ty_mesh_cmd_light_hsl_st_t sig_hsl;
+
+        ty_string_op_hexstr2hex(&data_pt[4], 4, buf_ar);
+        hsv_h = ((u16)buf_ar[0] << 8) + buf_ar[1];
+        if(hsv_h > 360)
+        {
+            hsv_h = 0;
+        }
+        ty_string_op_hexstr2hex(&data_pt[8], 4, buf_ar);
+        hsv_s = ((u16)buf_ar[0] << 8) + buf_ar[1];
+        if(hsv_s > 1000)
+        {
+            hsv_s = 1000;
+        }
+        ty_string_op_hexstr2hex(&data_pt[12], 4, buf_ar);
+        hsv_v = ((u16)buf_ar[0] << 8) + buf_ar[1];
+        if(hsv_v > 1000)
+        {
+            hsv_v = 1000;
+        }
+        ty_light_basis_tools_hsv2hsl(hsv_h, hsv_s, hsv_v, &sig_hsl.hue, &sig_hsl.sat, &sig_hsl.lightness);        
+        //                       源地址          目标地址        操作码             数据                  数据长度                         是否为响应
+        tuya_mesh_data_send(lutec_get_address(), t_addr, TUYA_LIGHT_HSL_SET, &sig_hsl,  sizeof(ty_mesh_cmd_light_hsl_st_t),     0,    0);
+    }
+        break;
+    case 0x06://情景  TUYA_VD_TUYA_WTITE  55 AA 00 0C 00 0B 04 31 62 38 30 【06 03 00 02 30 37】 87 
+    {
+        if(data_pt[1] == 0x03)//string类型
+        {
+            if(data_pt[3] == 0x02) //01 06 03 02 70 00 
+            {
+                u8 fw_data[6] = {0};
+                fw_data[0] = 0x01;
+                fw_data[1] = 0x06;
+                fw_data[2] = 0x03;
+                fw_data[3] = 0x02;
+                fw_data[4] = data_pt[5] << 4;//场景号
+                fw_data[5] = 0x00;                
+                //                      源地址          目标地址        操作码             数据   数据长度    是否为响应
+                tuya_mesh_data_send(lutec_get_address(), t_addr, TUYA_VD_TUYA_WTITE, fw_data,   6,     0,    0);
+            }
+            else
+            {                
+                u8 fw_data[255] = {0};
+                u32 scene_len = 0;
+                u8 par_temp[LIGHT_SCENE_MAX_LENGTH] = {0};
+                fw_data[0] = 0x01;
+                fw_data[1] = 0x06;        
+                fw_data[2] = 0x03;
+                memcpy(par_temp, &data_pt[4], data_pt[3]);
+                ty_light_basis_tools_scene_data_compress(par_temp, &fw_data[4], &scene_len);
+                fw_data[3]= (u8)scene_len;                        
+
+                // hal_uart_send(&data_pt[4],data_pt[3]);         
+                // u32 abcde = 0xFFFFFFFF;
+                // hal_uart_send(&abcde, 4); 
+                // hal_uart_send(&fw_data[4], scene_len);      
+
+                //                      源地址          目标地址        操作码             数据   数据长度         是否为响应
+                tuya_mesh_data_send(lutec_get_address(), t_addr, TUYA_VD_TUYA_WTITE, fw_data,   scene_len + 4,     0,    0);
+            }
+        }
+    }
+        break;
+    case 0x07://倒计时  TUYA_VD_TUYA_WTITE
+    {
+        u8 buf_data[8] = {0};          
+        buf_data[0] = 0x01;
+        buf_data[1] = data_pt[0];//0x07
+        buf_data[2] = data_pt[1];//0x02
+        buf_data[3] = data_pt[4];
+        buf_data[4] = data_pt[5];
+        buf_data[5] = data_pt[6];
+        buf_data[6] = data_pt[7];
+        //buf_data[7] = data_pt[7];        
+        //                      源地址          目标地址        操作码             数据   数据长度         是否为响应
+        tuya_mesh_data_send(lutec_get_address(), t_addr, TUYA_VD_TUYA_WTITE, buf_data,   7,     0,    0);
+    }
+        break;
+    default:
+        break;
+    }
+}
+
+/*-------------------------------------------------------------------------
+*简  介: 蓝牙远程下行自定义数据点处理：解析自己的点播指令，其余转发。
+*参  数: dpID|数据类型|指令长度|指向|目标地址|功能指令
 *返回值: 
 -------------------------------------------------------------------------*/
 void lutec_remote_bluetooth_data(u8* data_ptr, u8 data_l)
-{
+{    
 	if((data_ptr[0] > 100) && (data_ptr[0] < 129))//自定义数据点
 	{
         if((data_l <= 7) || (data_ptr[2] != 0x00)  || (data_ptr[3] != (data_l - 4)) || (data_ptr[4] != 0x01))//数据包不正确
         {
             return;
         }
-        //格式整理
+        //格式整理 
+        //原格式 dpID 00   len_h len_l 指向 addr_h addr_l para[n]
+        //转换成 01   dpID 00    len   指向 addr_h addr_l para[n]
+        //下标   0    1    2     3     4    5      6      7。。。
         data_ptr[2] = data_ptr[1];
         data_ptr[1] = data_ptr[0];
         data_ptr[0] = 0x01;
         u16 addrbuf = ((u16)data_ptr[5] << 8) + data_ptr[6];//地址
-        if(lutec_get_address() == addrbuf)//自己的数据
+        if((lutec_get_address() == addrbuf) || (addrbuf == 0x0000))//自己的数据 或者网关数据
         {
-            lutec_protocol_dp_analysis(&data_ptr[1]);//dp解析
+            uint8_t ack_len = 0;
+            //hal_uart_send(data_ptr, data_l);
+            ack_len = lutec_protocol_dp_analysis(&data_ptr[1]);//dp解析
+
+            if(ack_len > 6)//回复 （dpID*1 数据类型*1 长度*1 指向*1 地址*2）== 6
+            {
+                lutec_bt_data_up_by_wifi(data_ptr[1], &data_ptr[7], ack_len - 6);
+            #if BT_DATA_DEBUG    
+                hal_uart_send(data_ptr, ack_len + 1);
+            #endif
+            }
         }
         else //组播或者别人的指令
         {
@@ -595,18 +808,73 @@ void lutec_remote_bluetooth_data(u8* data_ptr, u8 data_l)
             {
                 lutec_protocol_dp_analysis(&data_ptr[1]);//dp解析
             }
+            app_light_vendor_data_send(addrbuf, data_ptr, data_l);//发出
+
             if(addrbuf >= 0xC000)//组播广播
             {
                 lutec_ack_by_wifi(data_ptr[1]);//简单回复
                 data_ptr[4] = 0x05;//转发
             }
-            app_light_vendor_data_publish(addrbuf, data_ptr, data_l);//发出
         }		
 	}
     else //其他涂鸦数据点---？
     {
 
     }
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_sig_dp_replay(u8 cmd_byte, u8 data_length, u16 addr_v, u8* sig_dp_ptr)
+{
+    uint8_t data_buffer[255] = {0};
+    u8 sub_i = 0;
+
+    data_buffer[0]  = 0x55;
+    data_buffer[1]  = 0xAA;
+    data_buffer[2]  = 0x00;
+    data_buffer[3]  = cmd_byte;
+    data_buffer[4]  = 0x00;
+    data_buffer[5]  = data_length + 5;
+    data_buffer[6]  = 0x04;
+    ty_string_op_hex2hexstr(&data_buffer[7], 4, addr_v);   
+    //data_buffer[7]  = 
+    //data_buffer[8]  = 
+    //data_buffer[9]  = 
+    //data_buffer[10]  = 
+    for(sub_i = 0; sub_i < data_length; sub_i++)
+    {
+        data_buffer[11 + sub_i] = sig_dp_ptr[sub_i];
+    }
+    data_buffer[11 + sub_i] = lutec_check_sum(data_buffer, sub_i + 11);        
+
+    hal_uart_send(data_buffer, data_length + 12);
+}
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_sig_up_by_wifi(u8 cmd_byte, u8 data_length, u8* data_ptr)
+{
+    uint8_t data_buffer[255] = {0};
+    u8 sub_i = 0;
+
+    data_buffer[0]  = 0x55;
+    data_buffer[1]  = 0xAA;
+    data_buffer[2]  = 0x00;
+    data_buffer[3]  = cmd_byte;
+    data_buffer[4]  = 0x00;
+    data_buffer[5]  = data_length;
+    for(sub_i = 0; sub_i < data_length; sub_i++)
+    {
+        data_buffer[6 + sub_i] = data_ptr[sub_i];
+    }
+    data_buffer[6 + sub_i] = lutec_check_sum(data_buffer, sub_i + 6);        
+
+    hal_uart_send(data_buffer, data_length + 7);
 }
 
 /*-------------------------------------------------------------------------

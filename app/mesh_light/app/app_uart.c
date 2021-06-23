@@ -139,9 +139,7 @@ void app_uart_run(void){
         PR_DEBUG_RAW("\n");
 
         //hal_uart_send(buf, len);    
-    }     
-//----------------------------------------wwpc 20210129
-#if 0
+    }  
     app_factory_test_run();
 #if LIGHT_CFG_UART_ENABLE
     static u8 work_state = 0;
@@ -152,8 +150,6 @@ void app_uart_run(void){
     }
 #endif
     app_uart_server_run();//解析FIFO中的数据，并调用相应的处理函数
-#endif 
-    lutec_uart_server_run(); //参考app_uart_server_run()对uart的FIFO进行处理
 }
 
 
@@ -161,7 +157,9 @@ void app_uart_run(void){
 * @description: run in a loop, handle uart data
 * @param {none}
 * @return: none
-**/
+**/   
+//----------------------------------------wwpc 20210611 重写函数
+#if 0
 static void app_uart_server_run(void){
     //static u8 is_factory = 1;
     u8 i,num = ty_fifo_get_size();
@@ -222,3 +220,114 @@ static void app_uart_server_run(void){
         return;     
     }
 }
+#endif 
+static void app_uart_server_run(void)
+{
+    //static u8 is_factory = 1;
+    u8 i,num = ty_fifo_get_size();
+    if(num < F_MIN_LEN)return;
+    
+    //1.judge head
+    u8 buf[255];
+
+    ty_fifo_read(buf,F_MIN_LEN);//get head length datas,judge if it's head
+
+    //66AA00--factory
+    //A55A00--mesh light 
+    //565600--觅睿串口数据
+    //55AA00--透传蓝牙数据
+    if(((buf[F_HEAD1] != 0x66) || (buf[F_HEAD2] != 0xaa) || (buf[F_HEAD3] != 0x00)) &&
+            ((buf[F_HEAD1] != 0xa5) || (buf[F_HEAD2] != 0x5a) || (buf[F_HEAD3] != 0x00)) &&
+            ((buf[F_HEAD1] != 0x56) || (buf[F_HEAD2] != 0x56) || (buf[4] != 0x01)) &&
+            ((buf[F_HEAD1] != 0x55) || (buf[F_HEAD2] != 0xAA) || (buf[F_HEAD3] > 0x01)))
+    { 
+        ty_fifo_pop(1);
+        return;
+    }
+
+    
+    //2.judge if it's a whole frame
+    u8 head = buf[F_HEAD1];
+    u8 cmd = buf[F_CMD];
+    u16 len = 0;
+    u8 total_len = 0;
+    switch(head)
+    {
+    case 0xA5: //mesh light            
+        len = buf[UART_F_LEN2];
+        total_len = len + UART_F_MIN_LEN;
+        break;
+    case 0x66: //授权数据       
+        len = buf[F_LEN2];
+        total_len = len + F_MIN_LEN;
+        break;
+    case 0x56: //wifi数据
+        len = ((u16)buf[2] << 8) + buf[3] + 4;
+        total_len = (u8)len;
+        break;
+    case 0x55: //远程蓝牙数据
+        len = ((u16)buf[4] << 8) + buf[5] + 7;
+        total_len = (u8)len;
+        break;
+    default:
+        break;
+    }
+    if(len > F_MAX_LEN)//验证长度
+    {                  
+        ty_fifo_pop(2);
+        return;
+    }
+    if(num < total_len)//等待数据包完整
+    {
+        return;
+    }    
+
+    //3.judge check sum 
+    ty_fifo_read(buf,total_len);//read all frame data
+    u8 ck_sum = app_uart_check_sum(buf,total_len-1);    
+        
+    if(ck_sum == buf[total_len-1])
+    {        
+        PR_DEBUG("%-30s","RECEIVE RAW DATA:");//LOG-FOR-DEBUG
+        for(i = 0; i < total_len; i++)
+        {
+            PR_DEBUG_RAW("%02X ",buf[i]&0xFF); 
+        }
+        PR_DEBUG_RAW("\n");
+
+        ty_fifo_pop(total_len);//correct frame,pop this frame length data    
+
+        switch(head)
+        {
+        case 0x66: //授权数据       
+            if(get_if_factory_test_close())
+            {
+                return;
+            }
+            app_factory_test_cmd(cmd,&buf[F_DATA], (u8)len);
+            break;
+        case 0xA5:  //mesh light          
+            ty_uart_cmd_server.receive_cmd(cmd, buf[0x04], &buf[0x07], (u8)len);
+            break;
+        case 0x56: //wifi模组数据
+            //hal_uart_send(buf,total_len); 
+            lutec_wifi_module_data(&buf[5], total_len - 6);
+            break;
+        case 0x55: //远程蓝牙数据
+        //hal_uart_send(buf,total_len); 
+            lutec_remote_bt_cmd(&buf[3]);
+            break;
+        default:
+            break;
+        }
+    }
+    else
+    {//check sum not correct,pop the head length data
+        ty_fifo_pop(2);
+        return;     
+    }
+}
+
+
+
+

@@ -13,12 +13,18 @@
 
     #include "lutec_config.h"
 
+    u8 lutec_get_mesh_connect_lfag(void);
+
 
     void lutec_light_control_by_lux(void);
+
+    void lutec_self_pir_dimmer_onoff(u8 set_val);
 
     void lutec_someone_control(u8 any_one);
 
     void lutec_set_pir_someone(void);
+
+    void lutec_stop_pir_someone_flow(void);
     
     void lutec_pir_light_control(void);
 
@@ -45,8 +51,6 @@
 	void lutec_main_init(void);
 
 	void lutec_main_loop(void);
-
-    void lutec_light_blink_control(void);
 
     void lutec_device_reset(void);
 
@@ -85,6 +89,13 @@
     void lutec_send_bright_sig_cmd(u16 dst_addr, u16 brightness_buffer);
     
     void lutec_send_temperature_sig_cmd(u16 dst_addr, u16 temp_para);
+
+
+    
+#if LIGHT_DIM_CCT
+    void lutec_cct_temp_pin_init(void);
+    void lutec_set_cct_temperature(u16 ct_temp);
+#endif
 
 
 #endif

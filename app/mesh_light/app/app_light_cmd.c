@@ -23,6 +23,8 @@
 //--------------------------------wwpc 20210129
 #include "lutec_main.h"
 
+#include "lutec_bt_dp.h"
+
 u8 light_not_disturb;
 extern LIGHT_MDEV_TEST_DATA_FLASH_T tProdResult;
 /**
@@ -136,6 +138,19 @@ OPERATE_LIGHT app_light_ctrl_data_bright_set(IN u16 usBright)
  */
 OPERATE_LIGHT app_light_ctrl_data_temperature_set(IN u16 usTemperature)
 {
+    
+    //--------------------------------------wwpc 20210116 固定色温--将CW调光改成亮度调光
+    u16 fixed_temperature = usTemperature;
+    #if LIGHT_TEMP_FIXED
+        fixed_temperature = 0x0000; //w-PWM(PC2)视为亮度
+    #endif
+    //--------------------------------------wwpc 20210513 cw调光-->CCT调光 即将C视为亮度，另设引脚输出色温PWM
+    #if LIGHT_DIM_CCT
+        fixed_temperature = 0x03E8;//c-PWM(PB5)视为亮度
+        lutec_set_cct_temperature(usTemperature);
+    #endif
+    //--------------------------------------wwpc 20210513  存储感应联动色温
+    lutec_set_pir_dim_temperature(usTemperature);
 
     if((usTemperature > CTRL_CW_BRIGHT_VALUE_MAX) \
         || (LIGHT_RGB == ty_light_cfg_init_get_lightway())) {
@@ -143,10 +158,21 @@ OPERATE_LIGHT app_light_ctrl_data_temperature_set(IN u16 usTemperature)
         return LIGHT_INVALID_PARM;
     }
 
-    tLightCtrlData.usTemper = usTemperature;
+    tLightCtrlData.usTemper = fixed_temperature;
     tLightCtrlData.eMode = WHITE_MODE;    /* change mode to white mode forcibly */
 
     return LIGHT_OK;
+
+    // if((usTemperature > CTRL_CW_BRIGHT_VALUE_MAX) \
+    //     || (LIGHT_RGB == ty_light_cfg_init_get_lightway())) {
+    //     TY_LOG_ERR("temperature value is exceed range,set error");
+    //     return LIGHT_INVALID_PARM;
+    // }
+
+    // tLightCtrlData.usTemper = usTemperature;
+    // tLightCtrlData.eMode = WHITE_MODE;    /* change mode to white mode forcibly */
+
+    // return LIGHT_OK;
 }
 
 /**
@@ -268,11 +294,19 @@ u16 app_light_ctrl_data_bright_get(void)
  * @param {OUT u16 *pTemperature -> temperature data return} 
  * @retval: OPERATE_LIGHT
  */
+// u16 app_light_ctrl_data_temperature_get(void)
+// {
+//     return tLightCtrlData.usTemper;
+// }
 u16 app_light_ctrl_data_temperature_get(void)
 {
+    //---------------------------------------wwpc 20210623  CCT调光的色温另外获取
+    #if LIGHT_DIM_CCT
+    return lutec_get_pir_dim_temperature();
+    #else
     return tLightCtrlData.usTemper;
+    #endif
 }
-
 
 /**
  * @brief: get light RGB data & original data

@@ -121,7 +121,16 @@ void app_mesh_uart_ctl(u8 fur, u8 *params, u8 len){
                     u8 par_temp[LIGHT_SCENE_MAX_LENGTH] = {0};
                     memcpy(par_temp, &params[1], len-1);
                     opRet = ty_light_basis_tools_scene_data_compress(par_temp, &par[4], &scene_len);
-                    par[3]= (u8)scene_len;                       
+                    par[3]= (u8)scene_len;                        
+
+                    // hal_uart_send(params,len);         
+                    // u32 abcde = 0xFFFFFFFF;
+                    // hal_uart_send(&abcde, 4); 
+
+                    // hal_uart_send(&par_temp,len-1);  
+                    // hal_uart_send(&abcde, 4); 
+                    
+                    // hal_uart_send(&par[4], scene_len);                    
                 }
                              
                 if(opRet == 0)

@@ -21,9 +21,9 @@
 #include "lutec_wifi.h"
 
 //有人标记
-static u8 anyone_flag = 0;//1-有人；0-无人
+static u8 anyone_flag = 1;//1-有人；0-无人
 
-
+static u8 pir_enable_flag = 1;
 
 
 /*-------------------------------------------------------------------------
@@ -51,6 +51,15 @@ void lutec_pir_signal_pin_init(void)
     //pin_state = gpio_read(GPIO_PA0) & 0x01;
 }
 
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_pir_enable_set(u8 onoff_v)
+{
+    pir_enable_flag = onoff_v > 0 ? 1 : 0;
+}
 
 /*-------------------------------------------------------------------------
 *简  介: 
@@ -65,6 +74,14 @@ void lutec_pir_loop(void)
     // {
     //     return;
     // }
+    if(pir_enable_flag == 0)
+    {
+        if(anyone_flag > 0)
+        {
+            anyone_flag = 0;
+        }
+        return;
+    }
 
     //someone_flag = gpio_read(GPIO_PA0) & 0x01;
     if((gpio_read(GPIO_PA0) & 0x01) == 0)//无人

@@ -171,7 +171,7 @@ u8 lutec_get_lux_flag(void)
 -------------------------------------------------------------------------*/
 void lutec_set_lux_threshold(u8 thsd_v)
 {
-    lux_threshold = thsd_v > 100 ? 0 : (100 - thsd_v) * 29;
+    lux_threshold = thsd_v > 100 ? 2900 : thsd_v * 29;
 }
 
 /*-------------------------------------------------------------------------
@@ -181,7 +181,7 @@ void lutec_set_lux_threshold(u8 thsd_v)
 -------------------------------------------------------------------------*/
 u8 lutec_get_lux_threshold(void)
 {
-    return (100 - (lux_threshold / 29));
+    return (lux_threshold / 29);
 }
 
 

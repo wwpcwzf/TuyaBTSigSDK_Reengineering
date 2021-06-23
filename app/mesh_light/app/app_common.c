@@ -100,12 +100,12 @@ int mesh_app_close_config_network_callback()
     if(1 == get_if_prov_success()){
         return -1;
     }
-    //--------------------------------------wwpc 20210224
+    //--------------------------------------wwpc 20210224 10分钟蓝牙配网时间
     //if(cnt >= 10)
     if(cnt >= MESH_CONFIG_TIME)
     {
         tuya_gatt_adv_beacon_enable(0);
-        //--------------------------------------wwpc 20210224
+        //--------------------------------------wwpc 20210224 未配网使用
         lutec_config_close_callback();
         return -1;
     }
@@ -170,8 +170,10 @@ void mesh_app_init(void){
     APP_LOG("%s\r\n",__FUNCTION__);
 
     tuya_mesh_data_recv_cb_init(&tuya_mesh_data_recv_callback);
-
+    //---------------------------------------------wwpc 20210413 10分钟配网时间---改成：未配网一直发广播
+    #if BLUETOOTH_CONFIG_NET_TIME_ENABLE
     mesh_app_close_config_network_init();
+    #endif
     
     #if LIGHT_CFG_REMOTE_ENABLE
     ty_light_remote_init();
@@ -284,7 +286,7 @@ void mesh_state_callback(mesh_state_t stat){
     TY_LOG_NOTICE("last mesh stat:%d, mesh stat %d",LastMeshStat,stat);
     if(LastMeshStat != stat) 
     {
-        //---------------------wwpc 20210129
+        //---------------------wwpc 20210129 截取蓝牙状态--自定义处理
         lutec_mesh_state_callback(stat);
 
         switch(stat) 
@@ -409,7 +411,7 @@ void app_tuya_vendor_light_dp_data(u8 *par, int par_len){
 **/
 void app_tuya_vendor_set_light_data(uint16_t src_addr, uint16_t dst_addr, u8 *par, int par_len){
     if(par_len < 2){
-        OPERATE_LIGHT ret = 1;
+        OPERATE_LIGHT ret = 1;  //处理灯的模式指令
         if(*par != app_light_ctrl_data_mode_get_value()){ //if Mode switching
             ret = app_light_ctrl_data_mode_set(*par);
             if(LIGHT_OK == ret){
@@ -422,7 +424,7 @@ void app_tuya_vendor_set_light_data(uint16_t src_addr, uint16_t dst_addr, u8 *pa
         switch(par[0]){
             case 1:
             {              
-                //--------------------------wwpc 20210129
+                //--------------------------wwpc 20210129 截取自定义DP数据
                 //app_tuya_vendor_light_dp_data(par, par_len);
                 if((par[1] > 100) && (par[1] < 129))
                 {
@@ -492,9 +494,12 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
     }
     uart_reply_addr = src_addr;
 
-    //----------------测试
+    //----------------测试 打印收到的蓝牙数据
     #if BT_DATA_DEBUG
-    hal_uart_send(data, data_len);
+    hal_uart_send(&src_addr, 2);
+    hal_uart_send(&dst_addr, 2);
+    hal_uart_send(&opcode, 4);
+    hal_uart_send(data,data_len);
     #endif
 
     APP_LOG_DUMP("recv data\r\n", data, data_len);
@@ -667,7 +672,7 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
         break;
         case TUYA_VD_TUYA_READ:
         {             
-            //-----------------------wwpc 20210311  app激活推送
+            //-----------------------wwpc 20210424  app激活设备时推送状态
             lutec_updata_app_callback(src_addr);
             
             if(0==data_len)
@@ -747,7 +752,7 @@ void tuya_mesh_data_recv_callback(uint16_t src_addr, uint16_t dst_addr, uint32_t
 
     APP_LOG("ctrl data need to proc flag =%d", bActiveFlag);
 
-    //-----------------------------------------wwpc 20210326  
+    //-----------------------------------------wwpc 20210326 自定义数据存储
     bActiveFlag = lutec_get_save_data_flag() > 0 ? TRUE : bActiveFlag;
 
     if(bActiveFlag) 

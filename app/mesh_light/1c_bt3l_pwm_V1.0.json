@@ -1,7 +1,7 @@
 {
     "name": "oem_1c_tlsr8250_light1_pwm_user",
     "description": "mesh rgbwcl online oem cfg",
-    "version": "1.0",
+    "version": "1.3",
     "ic":"tlsr825x",
     "hardware":"TYBT3L",
     "build":{
@@ -50,7 +50,7 @@
             "colormax":"100",
             "wfcfg":"spcl_auto",
             "rstmode":"0",
-            "rstnum":"5",
+            "rstnum":"10",
             "remdmode":"0",
             "rstcor":"c",
             "rstbr":"50",

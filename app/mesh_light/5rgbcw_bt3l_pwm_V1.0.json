@@ -1,7 +1,7 @@
 {
     "name": "oem_5rgbcw_tlsr8250_light5_pwm_user",
     "description": "mesh rgbwcl online oem cfg",
-    "version": "1.0",
+    "version": "1.3",
     "ic":"tlsr825x",
     "hardware":"TYBT3L",
     "build":{
@@ -17,7 +17,7 @@
     },
     "product":{
         "kind":"sig_mesh_light",
-        "pid":"XXXXXXXX",
+        "pid":"hhfd6tmx",
         "vendorid":"1015",
 	    "power_reset_cnt":"5",
         "power_reset_time":"5",
@@ -30,7 +30,7 @@
             "light_cfg_prod_driver_need_init":"0",
             "light_cfg_3in1_save":"0",
             "light_cfg_remote_enable":"1",
-            "light_cfg_uart_enable":"0",
+            "light_cfg_uart_enable":"1",
 
 			"Jsonver":"1.1.8",
 			"category":"1015",
@@ -75,6 +75,7 @@
 			"c_lv":"1",
             "w_pin":"7",
 			"w_lv":"1",
+
             "ctrl_pin":"12",
 			"ctrl_lv":"1",
 			"crc":"111"

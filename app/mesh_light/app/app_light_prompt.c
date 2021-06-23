@@ -28,6 +28,9 @@
 
 #include "app_light_cmd.h"
 
+//------------------------------------------wwpc 20210413
+#include "lutec_main.h"
+
 
 #define BREATH_UNIT_TIME             2  //2s @attention: accurate time is 2100ms
 #define BREATH_ALWAY_ON_TIME        602         //@attention: breath alway on config time
@@ -407,12 +410,21 @@ static OPERATE_LIGHT app_light_prompt_ctrl_auto_start(void)
             TY_LOG_ERR("start blink timer error!");
         }
 
-    } else {    /* breath when pairing */
+    } 
+    else 
+    {   //-----------------------------------wwpc 20210413 蓝牙配网呼吸提醒----改为：不呼吸，PIR感应亮灯
+    #if BT_CONFIG_NET_BREATH_ENABLE
+        /* breath when pairing */
         tuya_gatt_adv_beacon_enable(0);
         opRet = app_light_ctrl_breathing_start(1, ty_light_json_config_get_remdtime() / BREATH_UNIT_TIME);
-        if(opRet != LIGHT_OK) {
+        if(opRet != LIGHT_OK) 
+        {
             TY_LOG_ERR("start breath timer error!");
         }
+    #else
+        tuya_gatt_adv_beacon_enable(1);
+        lutec_set_pir_someone();
+    #endif 
     } 
 
     return opRet;

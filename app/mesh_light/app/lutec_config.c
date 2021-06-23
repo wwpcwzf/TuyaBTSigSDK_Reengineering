@@ -100,8 +100,33 @@ void lutec_string_copy(u8* str_to, u8* str_from, u8 str_l)
 
 
 
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+void lutec_u32_to_8array(u32 s_value, u8* arr_ptr)
+{
+    arr_ptr[0] = (u8)(s_value >> 24);
+    arr_ptr[1] = (u8)(s_value >> 16);
+    arr_ptr[2] = (u8)(s_value >> 8);
+    arr_ptr[3] = (u8)(s_value >> 0);
+}
 
-
+/*-------------------------------------------------------------------------
+*简  介: 
+*参  数: 
+*返回值: 
+-------------------------------------------------------------------------*/
+u32 lutec_u8array_to_u32(u8* arr_ptr)
+{
+    u32 buffer32_value = 0;
+    buffer32_value = arr_ptr[0];
+    buffer32_value = (buffer32_value << 8) + arr_ptr[1];
+    buffer32_value = (buffer32_value << 8) + arr_ptr[2];
+    buffer32_value = (buffer32_value << 8) + arr_ptr[3];
+    return buffer32_value;
+}
 
 
 

@@ -24,3 +24,20 @@ extern u8 ty_fifo_read(ElementType *pdata,u8 len);
 extern u8 ty_fifo_pop(u8 len);
 
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
